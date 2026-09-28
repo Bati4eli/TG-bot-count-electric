@@ -1,5 +1,6 @@
 package ru.sokolniki.electricity.tariffs
 
+import com.sun.org.slf4j.internal.LoggerFactory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -29,33 +30,40 @@ class MosenergosbytTariffProvider {
         val page = sendGet(CALCULATOR_URI)
         val csrfToken = CSRF_PATTERN.find(page)?.groupValues?.get(1)
             ?: error("Мосэнергосбыт не передал CSRF-токен для проверки тарифов.")
-        val response = sendPost(
-            CALCULATOR_ACTION_URI,
-            formBody(
-                "consumptionArray[t1]" to "1",
-                "consumptionArray[t2]" to "1",
-                "location" to "MSC_DISTRICT",
-                "locationType" to "COUNTRY",
-                "electricStoveUse" to "Y",
-                "sessid" to csrfToken,
-            ),
-        )
-        val root = json.parseToJsonElement(response).jsonObject
-        check(root["status"]?.jsonPrimitive?.content == "success") { "Мосэнергосбыт не вернул тарифы." }
-        val rows = root["data"]?.jsonObject?.get("selected")?.jsonObject?.get("report")?.jsonArray
-            ?: error("Мосэнергосбыт вернул ответ без тарифной таблицы.")
-        val prices = rows.associate { row ->
-            val fields = row.jsonObject
-            fields["zoneNumber"]!!.jsonPrimitive.content.toInt() to fields["price"]!!.jsonPrimitive.content
+        try {
+            val response = sendPost(
+                CALCULATOR_ACTION_URI,
+                formBody(
+                    "consumptionArray[t1]" to "1",
+                    "consumptionArray[t2]" to "1",
+                    "location" to "MSC_DISTRICT",
+                    "locationType" to "COUNTRY",
+                    "electricStoveUse" to "Y",
+                    "sessid" to csrfToken,
+                ),
+            )
+            val root = json.parseToJsonElement(response).jsonObject
+            check(root["status"]?.jsonPrimitive?.content == "success") {
+                "Мосэнергосбыт не вернул тарифы."
+            }
+            val rows = root["data"]?.jsonObject?.get("selected")?.jsonObject?.get("report")?.jsonArray
+                ?: error("Мосэнергосбыт вернул ответ без тарифной таблицы.")
+            val prices = rows.associate { row ->
+                val fields = row.jsonObject
+                fields["zoneNumber"]!!.jsonPrimitive.content.toInt() to fields["price"]!!.jsonPrimitive.content
+            }
+            return OfficialTariffs(
+                tariffs = Tariffs(
+                    decimalToCents(requireNotNull(prices[1]) { "В ответе нет тарифа Т1." }),
+                    decimalToCents(requireNotNull(prices[2]) { "В ответе нет тарифа Т2." }),
+                ),
+                sourceUrl = CALCULATOR_URI.toString(),
+                retrievedAt = Instant.now(),
+            )
+        } catch (e: Exception) {
+            System.err.println("Ошибочка вышла: " + e.message)
+            throw e
         }
-        return OfficialTariffs(
-            tariffs = Tariffs(
-                decimalToCents(requireNotNull(prices[1]) { "В ответе нет тарифа Т1." }),
-                decimalToCents(requireNotNull(prices[2]) { "В ответе нет тарифа Т2." }),
-            ),
-            sourceUrl = CALCULATOR_URI.toString(),
-            retrievedAt = Instant.now(),
-        )
     }
 
     private fun sendGet(uri: URI): String = http.send(

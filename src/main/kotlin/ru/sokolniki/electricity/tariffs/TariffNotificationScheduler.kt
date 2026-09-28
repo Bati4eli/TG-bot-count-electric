@@ -50,7 +50,7 @@ class TariffNotificationJob(
         return "$headline\n\n" +
             "$actualText" +
             "Рекомендуемые: <code>Т1 ${format(alert.official.tariffs.t1Cents)} ₽ · Т2 ${format(alert.official.tariffs.t2Cents)} ₽</code>\n" +
-            "Параметры: Московская область · сельский тариф · электроплита · 2 зоны · диапазон 1.\n\n" +
+            "Параметры: Московская область · сельский тариф · 2 тарифа.\n\n" +
             "$source\n\n" +
             "Кнопка ниже применит тарифы только для следующих показаний. История не изменится."
     }
