@@ -46,13 +46,13 @@ object KeyboardFactory {
         })
     }
 
-    fun copyText(text: String): JsonObject {
+    fun copyText(text: String, buttonText: String = "Скопировать"): JsonObject {
         require(text.length in 1..256) { "Текст для копирования Telegram должен иметь длину от 1 до 256 символов." }
         return buildJsonObject {
             put("inline_keyboard", buildJsonArray {
                 add(buildJsonArray {
                     add(buildJsonObject {
-                        put("text", JsonPrimitive("Скопировать"))
+                        put("text", JsonPrimitive(buttonText))
                         put("copy_text", buildJsonObject { put("text", JsonPrimitive(text)) })
                     })
                 })

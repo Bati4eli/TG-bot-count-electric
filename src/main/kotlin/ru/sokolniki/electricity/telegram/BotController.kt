@@ -238,16 +238,23 @@ class BotController(
             }
             val bytes = telegram.downloadDocument(document)
             val entries = history.import(bytes)
+            val oldTotal = readings.totalPaymentRubles(message.userId)
+            val newTotal = readings.importedHistoryTotalPaymentRubles(entries)
+            val difference = Math.subtractExact(newTotal, oldTotal)
             val result = readings.replaceHistory(message.userId, entries)
             repository.clearState(message.userId)
-            sendWithMenu(
+            val totalsText = historyTotalsText(oldTotal, newTotal, difference)
+            telegram.sendMessage(
                 message.chatId,
                 "✅ История успешно заменена.\n\n" +
                     "Лог импорта:\n" +
                     "• удалено прежних записей: ${result.removedCount}\n" +
                     "• загружено записей из Excel: ${result.importedCount}\n" +
-                    "• активные тарифы взяты из последней строки файла.",
+                    "• активные тарифы взяты из последней строки файла.\n\n" +
+                    totalsText,
+                KeyboardFactory.copyText(totalsText, buttonText = "Скопировать суммы"),
             )
+            showMenuOrStartSetup(message.userId, message.chatId)
         } catch (error: Exception) {
             telegram.sendMessage(
                 message.chatId,
@@ -387,5 +394,11 @@ class BotController(
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
+
+    private fun historyTotalsText(oldTotal: Long, newTotal: Long, difference: Long): String =
+        "💰 Суммы за всю историю:\n" +
+            "Старая: $oldTotal ₽\n" +
+            "Новая: $newTotal ₽\n" +
+            "Разница: ${if (difference > 0) "+" else ""}$difference ₽"
 }
 

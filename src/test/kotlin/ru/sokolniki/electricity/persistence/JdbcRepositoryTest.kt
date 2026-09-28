@@ -77,9 +77,12 @@ class JdbcRepositoryTest {
             repository.saveProfile(UserProfile(2, 202, "2"))
             repository.saveActiveTariffs(1, Tariffs(733, 332))
             repository.saveActiveTariffs(2, Tariffs(900, 400))
+            ReadingService(repository, ElectricityCalculator(), clockAt("2026-09-27")).addReading(1, 10_000, 20_000)
             val service = ReadingService(repository, ElectricityCalculator(), clock)
-            service.addReading(1, 10_000, 20_000)
+            service.addReading(1, 10_200, 20_300)
             service.addReading(2, 70_000, 80_000)
+
+            assertEquals(25, service.totalPaymentRubles(1))
 
             val result = service.replaceHistory(
                 1,
@@ -89,7 +92,13 @@ class JdbcRepositoryTest {
                 ),
             )
 
-            assertEquals(1, result.removedCount)
+            assertEquals(16, service.importedHistoryTotalPaymentRubles(
+                listOf(
+                    HistoryEntry(LocalDate.parse("2026-07-01"), 11_000, 21_000, Tariffs(700, 300)),
+                    HistoryEntry(LocalDate.parse("2026-08-01"), 11_100, 21_300, Tariffs(710, 310)),
+                ),
+            ))
+            assertEquals(2, result.removedCount)
             assertEquals(2, result.importedCount)
             assertEquals(2, repository.findReadings(1).size)
             assertEquals(70_000, repository.findLatestReading(2)?.current?.t1Hundredths)

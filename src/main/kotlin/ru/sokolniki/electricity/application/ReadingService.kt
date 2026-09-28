@@ -43,6 +43,21 @@ class ReadingService(
 
     fun historyForExport(userId: Long): List<MeterReading> = repository.findReadings(userId)
 
+    fun totalPaymentRubles(userId: Long): Long = calculateTotal(repository.findReadings(userId))
+
+    fun importedHistoryTotalPaymentRubles(entries: List<HistoryEntry>): Long = calculateTotal(
+        entries.map { entry ->
+            MeterReading(
+                id = 0,
+                telegramUserId = 0,
+                date = entry.date,
+                t1Hundredths = entry.t1Hundredths,
+                t2Hundredths = entry.t2Hundredths,
+                tariffs = entry.tariffs,
+            )
+        },
+    )
+
     fun replaceHistory(userId: Long, entries: List<HistoryEntry>): HistoryReplacementResult {
         require(entries.isNotEmpty()) { "В файле должно быть хотя бы одно показание." }
         entries.zipWithNext().forEachIndexed { index, (previous, current) ->
@@ -81,6 +96,16 @@ class ReadingService(
         EditableField.READING_T2 -> current.copy(t2Hundredths = newValue)
         EditableField.TARIFF_T1 -> current.copy(tariffs = Tariffs(newValue, current.tariffs.t2Cents))
         EditableField.TARIFF_T2 -> current.copy(tariffs = Tariffs(current.tariffs.t1Cents, newValue))
+    }
+
+    private fun calculateTotal(history: List<MeterReading>): Long {
+        var previous: MeterReading? = null
+        var total = 0L
+        history.forEach { current ->
+            total = Math.addExact(total, calculator.calculate(current, previous).paymentRubles)
+            previous = current
+        }
+        return total
     }
 
     private fun LatestReading.toCalculation(): ReadingCalculation = calculator.calculate(current, previous)
