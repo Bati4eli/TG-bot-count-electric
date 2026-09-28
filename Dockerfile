@@ -1,4 +1,4 @@
-FROM gradle:9.2.0-jdk25 AS build
+FROM dh-mirror.gitverse.ru/gradle:9.2.0-jdk25 AS build
 
 WORKDIR /workspace
 
@@ -9,7 +9,7 @@ RUN chmod +x gradlew
 COPY src src
 RUN gradle installDist --no-daemon
 
-FROM eclipse-temurin:25-jre
+FROM dh-mirror.gitverse.ru/eclipse-temurin:25-jre
 
 RUN groupadd --system bot && useradd --system --gid bot --create-home bot
 WORKDIR /app

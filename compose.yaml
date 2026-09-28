@@ -11,3 +11,12 @@ services:
 volumes:
   electricity_data:
 
+#mirrors:
+#  docker.io:
+#    endpoint:
+#      - "https://dockerhub.timeweb.cloud",
+#      - "https://dockerhub1.beget.com",
+#      - "https://mirror.gcr.io",
+#      - "https://ghcr.io",
+#      - "https://quay.io",
+#      - "https://public.ecr.aws"
