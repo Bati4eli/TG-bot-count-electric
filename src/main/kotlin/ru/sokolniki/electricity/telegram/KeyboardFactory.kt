@@ -8,7 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import ru.sokolniki.electricity.domain.Tariffs
 import java.math.BigDecimal
 
-/** Stores text labels used by reply keyboards and command handling. */
+/** Хранит текстовые подписи, используемые в клавиатурах и обработке команд. */
 object ButtonText {
     const val ADD_READING = "➕ Внести показания"
     const val TARIFFS = "⚙️ Тарифы"
@@ -23,7 +23,7 @@ object ButtonText {
     const val MENU = "◀️ Меню"
 }
 
-/** Creates Telegram reply and inline keyboards used by the bot conversation. */
+/** Создаёт обычные и встроенные клавиатуры Telegram, используемые в диалоге с ботом. */
 object KeyboardFactory {
     fun main(): JsonObject = replyKeyboard(
         listOf(
@@ -66,7 +66,7 @@ object KeyboardFactory {
         }
     }
 
-    /** Creates the explicit user action that adopts the latest official tariff pair. */
+    /** Создаёт явное действие пользователя для применения последней официальной пары тарифов. */
     fun applyRecommendedTariffs(tariffs: Tariffs): JsonObject = buildJsonObject {
         put("inline_keyboard", buildJsonArray {
             add(buildJsonArray {

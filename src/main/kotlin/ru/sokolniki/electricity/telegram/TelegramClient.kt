@@ -18,7 +18,7 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.UUID
 
-/** Represents the message fields from a Telegram update that the bot needs. */
+/** Представляет необходимые боту поля сообщения из обновления Telegram. */
 data class IncomingMessage(
     val userId: Long,
     val chatId: Long,
@@ -26,14 +26,14 @@ data class IncomingMessage(
     val document: IncomingDocument? = null,
 )
 
-/** Describes a document attached to an incoming Telegram message. */
+/** Описывает документ, приложенный к входящему сообщению Telegram. */
 data class IncomingDocument(
     val fileId: String,
     val fileName: String?,
     val fileSize: Long?,
 )
 
-/** Represents an inline-keyboard callback received from Telegram. */
+/** Представляет обратный вызов от встроенной клавиатуры, полученный из Telegram. */
 data class IncomingCallback(
     val id: String,
     val userId: Long,
@@ -41,14 +41,14 @@ data class IncomingCallback(
     val data: String?,
 )
 
-/** Represents the supported parts of a Telegram update. */
+/** Представляет поддерживаемые части обновления Telegram. */
 data class IncomingUpdate(
     val updateId: Long,
     val message: IncomingMessage? = null,
     val callback: IncomingCallback? = null,
 )
 
-/** Minimal HTTP client for the Telegram Bot API and Telegram file downloads. */
+/** Минимальный HTTP-клиент для Telegram Bot API и загрузки файлов из Telegram. */
 class TelegramClient(private val token: String) {
     private val apiBase = URI.create("https://api.telegram.org/bot$token/")
     private val fileApiBase = "https://api.telegram.org/file/bot$token/"
@@ -207,7 +207,7 @@ class TelegramClient(private val token: String) {
     }
 }
 
-/** Runs long polling, dispatches updates, and stores the last processed update identifier. */
+/** Выполняет длинный опрос, распределяет обновления и сохраняет идентификатор последнего обработанного. */
 class BotRunner(
     private val telegram: TelegramClient,
     private val controller: BotController,

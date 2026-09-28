@@ -3,13 +3,13 @@ package ru.sokolniki.electricity.config
 import java.nio.file.Path
 import java.nio.file.Paths
 
-/** Holds immutable settings required to run the bot. */
+/** Хранит неизменяемые настройки, необходимые для запуска бота. */
 data class AppConfig(
     val botToken: String,
     val databasePath: Path,
 )
 
-/** Loads application settings from environment variables without exposing secrets in source code. */
+/** Загружает настройки из переменных окружения, не раскрывая секреты в исходном коде. */
 object AppConfigLoader {
     fun load(environment: Map<String, String> = System.getenv()): AppConfig {
         val token = environment["BOT_TOKEN"]?.trim().orEmpty()

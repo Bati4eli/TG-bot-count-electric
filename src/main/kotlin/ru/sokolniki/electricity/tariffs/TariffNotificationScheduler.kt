@@ -9,7 +9,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/** Delivers tariff-change alerts to bot users after a successful official tariff refresh. */
+/** Рассылает пользователям бота уведомления об изменениях тарифов после успешного официального запроса. */
 class TariffNotificationJob(
     private val updates: TariffUpdateService,
     private val telegram: TelegramClient,
@@ -58,7 +58,7 @@ class TariffNotificationJob(
     private fun format(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',')
 }
 
-/** Runs a tariff notification job once at startup and then every day at 03:00 Moscow time. */
+/** Запускает задачу уведомлений при старте, а затем каждый день в 03:00 по московскому времени. */
 class DailyTariffNotificationScheduler(
     private val job: Runnable,
     private val clock: Clock,
@@ -67,7 +67,7 @@ class DailyTariffNotificationScheduler(
         Thread(runnable, "official-tariff-refresh").apply { isDaemon = true }
     }
 
-    /** Starts the non-blocking initial refresh and schedules future daily checks. */
+    /** Запускает неблокирующее первоначальное обновление и планирует последующие ежедневные проверки. */
     fun start() {
         executor.execute(job)
         executor.scheduleAtFixedRate(job, delayUntilNextThreeAm(), Duration.ofDays(1).toMillis(), TimeUnit.MILLISECONDS)

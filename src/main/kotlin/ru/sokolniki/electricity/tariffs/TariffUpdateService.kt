@@ -5,15 +5,15 @@ import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.persistence.UserTariffTarget
 
 /**
- * Stores the latest official tariff recommendation and finds users who need to receive an alert.
+ * Хранит последнюю официальную рекомендацию по тарифам и находит пользователей для уведомления.
  *
- * It never changes a user's tariff; applying a recommendation is an explicit user action.
+ * Самостоятельно тариф пользователя не изменяет: рекомендация применяется только по явному действию пользователя.
  */
 class TariffUpdateService(
     private val repository: JdbcRepository,
     private val provider: MosenergosbytTariffProvider,
 ) {
-    /** Retrieves current official tariffs and returns users that have not yet received this alert. */
+    /** Получает текущие официальные тарифы и возвращает пользователей, ещё не получивших уведомление. */
     fun refresh(): List<TariffAlert> {
         val official = provider.fetch()
         val previous = repository.findOfficialTariffs()
@@ -30,12 +30,12 @@ class TariffUpdateService(
         }
     }
 
-    /** Returns the latest retrieved official recommendation without making a network request. */
+    /** Возвращает последнюю полученную официальную рекомендацию без сетевого запроса. */
     fun latest(): OfficialTariffs? = repository.findOfficialTariffs()?.let { snapshot ->
         OfficialTariffs(snapshot.tariffs, OFFICIAL_CALCULATOR_URL, snapshot.retrievedAt)
     }
 
-    /** Saves the latest recommendation as the caller's active tariff for future readings only. */
+    /** Сохраняет последнюю рекомендацию как активный тариф пользователя только для будущих показаний. */
     fun applyLatestRecommendation(userId: Long): Tariffs {
         val tariffs = requireNotNull(repository.findOfficialTariffs()) {
             "Рекомендуемые тарифы ещё не загружены. Повторите попытку через минуту."
@@ -45,7 +45,7 @@ class TariffUpdateService(
         return tariffs
     }
 
-    /** Marks an alert as delivered to prevent repeated daily notifications for the same tariff. */
+    /** Отмечает уведомление доставленным, чтобы не повторять его ежедневно для того же тарифа. */
     fun markAlertSent(userId: Long, tariffs: Tariffs) = repository.markTariffAlertSent(userId, tariffs)
 
     companion object {
@@ -53,7 +53,7 @@ class TariffUpdateService(
     }
 }
 
-/** Contains one recipient and the official tariff change or mismatch that must be communicated. */
+/** Содержит получателя и изменение либо расхождение официальных тарифов, о котором нужно сообщить. */
 data class TariffAlert(
     val target: UserTariffTarget,
     val official: OfficialTariffs,

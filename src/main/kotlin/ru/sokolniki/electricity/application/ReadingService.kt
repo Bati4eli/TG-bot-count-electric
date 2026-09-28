@@ -13,7 +13,7 @@ import java.time.Clock
 import java.time.LocalDate
 
 /**
- * Implements use cases for adding, editing, exporting, and replacing a user's meter-reading history.
+ * Реализует сценарии добавления, редактирования, экспорта и замены истории показаний пользователя.
  */
 class ReadingService(
     private val repository: JdbcRepository,

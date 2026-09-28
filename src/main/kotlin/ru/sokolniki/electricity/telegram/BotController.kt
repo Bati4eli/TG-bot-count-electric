@@ -14,7 +14,7 @@ import ru.sokolniki.electricity.tariffs.TariffUpdateService
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** Routes Telegram updates to setup, reading, history, and menu use cases. */
+/** Направляет обновления Telegram к сценариям настройки, показаний, истории и меню. */
 class BotController(
     private val telegram: TelegramClient,
     private val repository: JdbcRepository,

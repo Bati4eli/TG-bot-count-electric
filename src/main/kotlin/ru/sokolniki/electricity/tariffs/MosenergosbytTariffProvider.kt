@@ -19,10 +19,10 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Loads first-range two-zone tariffs for a rural Moscow Region household with an electric stove.
+ * Загружает двухзонные тарифы первого диапазона для сельского дома в Московской области с электроплитой.
  *
- * The provider uses the structured endpoint called by the official Mosenergosbyt calculator. It
- * deliberately does not parse the calculator's HTML output.
+ * Провайдер использует структурированную конечную точку, которую вызывает официальный калькулятор
+ * Мосэнергосбыта, и намеренно не разбирает HTML-страницу калькулятора.
  */
 class MosenergosbytTariffProvider {
     private val cookies = CookieManager(null, CookiePolicy.ACCEPT_ALL)
@@ -32,7 +32,7 @@ class MosenergosbytTariffProvider {
         .build()
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Retrieves the current T1 and T2 tariffs from the official calculator endpoint. */
+    /** Получает текущие тарифы Т1 и Т2 через конечную точку официального калькулятора. */
     fun fetch(): OfficialTariffs {
         val page = sendGet(CALCULATOR_URI)
         val csrfToken = CSRF_PATTERN.find(page)?.groupValues?.get(1)
@@ -114,7 +114,7 @@ class MosenergosbytTariffProvider {
     }
 }
 
-/** Holds a tariff recommendation together with the official service from which it was retrieved. */
+/** Хранит рекомендацию по тарифам и официальный сервис, из которого она получена. */
 data class OfficialTariffs(
     val tariffs: Tariffs,
     val sourceUrl: String,

@@ -3,14 +3,14 @@ package ru.sokolniki.electricity.domain
 import java.math.BigDecimal
 import java.time.LocalDate
 
-/** Identifies a Telegram user and their assigned garden plot. */
+/** Идентифицирует пользователя Telegram и закреплённый за ним участок. */
 data class UserProfile(
     val telegramUserId: Long,
     val chatId: Long,
     val plotNumber: String,
 )
 
-/** Stores T1 and T2 electricity prices in kopecks per kWh. */
+/** Хранит стоимость электроэнергии для Т1 и Т2 в копейках за кВт·ч. */
 data class Tariffs(
     val t1Cents: Long,
     val t2Cents: Long,
@@ -24,7 +24,7 @@ data class Tariffs(
     val t2Rubles: BigDecimal get() = BigDecimal.valueOf(t2Cents, 2)
 }
 
-/** Stores one dated meter snapshot with the tariffs that applied to it. */
+/** Хранит показания счётчика на дату вместе с действовавшими для них тарифами. */
 data class MeterReading(
     val id: Long,
     val telegramUserId: Long,
@@ -42,7 +42,7 @@ data class MeterReading(
     val t2Kwh: BigDecimal get() = BigDecimal.valueOf(t2Hundredths, 2)
 }
 
-/** Represents one validated row from the Excel history import. */
+/** Представляет одну проверенную строку истории, импортируемой из Excel. */
 data class HistoryEntry(
     val date: LocalDate,
     val t1Hundredths: Long,
@@ -55,7 +55,7 @@ data class HistoryEntry(
     }
 }
 
-/** Contains energy consumed in each tariff zone between two readings. */
+/** Содержит расход электроэнергии по каждой тарифной зоне между двумя показаниями. */
 data class Consumption(
     val t1Kwh: BigDecimal,
     val t2Kwh: BigDecimal,
@@ -63,7 +63,7 @@ data class Consumption(
     val totalKwh: BigDecimal get() = t1Kwh + t2Kwh
 }
 
-/** Combines a reading with its calculated consumption and rounded payment. */
+/** Объединяет показание с рассчитанным расходом и округлённой суммой к оплате. */
 data class ReadingCalculation(
     val current: MeterReading,
     val previous: MeterReading?,
@@ -71,13 +71,13 @@ data class ReadingCalculation(
     val paymentRubles: Long,
 )
 
-/** Holds the most recent reading and the reading immediately before it. */
+/** Хранит последнее показание и показание, непосредственно ему предшествующее. */
 data class LatestReading(
     val current: MeterReading,
     val previous: MeterReading?,
 )
 
-/** Enumerates the bot dialogue states persisted for a user. */
+/** Перечисляет сохраняемые состояния диалога бота с пользователем. */
 enum class ConversationStep {
     IDLE,
     SETUP_PLOT,
@@ -95,13 +95,13 @@ enum class ConversationStep {
     IMPORT_HISTORY,
 }
 
-/** Stores the current dialogue step and an optional intermediate numeric value. */
+/** Хранит текущий шаг диалога и необязательное промежуточное числовое значение. */
 data class ConversationState(
     val step: ConversationStep,
     val draftValue: Long? = null,
 )
 
-/** Enumerates the parts of the latest reading that a user may edit. */
+/** Перечисляет части последнего показания, которые пользователь может изменить. */
 enum class EditableField {
     READING_T1,
     READING_T2,

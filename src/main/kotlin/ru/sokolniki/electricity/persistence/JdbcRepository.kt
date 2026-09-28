@@ -15,7 +15,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Properties
 
-/** Persists isolated Telegram-user data and bot state in the local SQLite database. */
+/** Сохраняет изолированные данные пользователей Telegram и состояние бота в локальной базе SQLite. */
 class JdbcRepository(
     private val databasePath: Path,
     private val clock: Clock = Clock.systemUTC(),
@@ -181,7 +181,7 @@ class JdbcRepository(
         }
     }
 
-    /** Returns profiles together with their optional active tariffs for tariff-change notifications. */
+    /** Возвращает профили вместе с необязательными активными тарифами для уведомлений об изменениях. */
     fun findUsersWithActiveTariffs(): List<UserTariffTarget> = connect().use { connection ->
         connection.prepareStatement(
             """
@@ -212,7 +212,7 @@ class JdbcRepository(
         }
     }
 
-    /** Reads the latest globally retrieved official T1/T2 pair and its successful retrieval time. */
+    /** Читает последнюю полученную официальную пару Т1/Т2 и время успешного запроса. */
     fun findOfficialTariffs(): OfficialTariffSnapshot? = connect().use { connection ->
         val t1 = readStateValue(connection, OFFICIAL_TARIFF_T1_KEY)
         val t2 = readStateValue(connection, OFFICIAL_TARIFF_T2_KEY)
@@ -224,14 +224,14 @@ class JdbcRepository(
         }
     }
 
-    /** Persists the latest globally retrieved official tariff pair and successful retrieval time. */
+    /** Сохраняет последнюю официальную пару тарифов и время успешного запроса. */
     fun saveOfficialTariffs(tariffs: Tariffs) = inTransaction { connection ->
         saveStateValue(connection, OFFICIAL_TARIFF_T1_KEY, tariffs.t1Cents)
         saveStateValue(connection, OFFICIAL_TARIFF_T2_KEY, tariffs.t2Cents)
         saveStateValue(connection, OFFICIAL_TARIFF_RETRIEVED_AT_KEY, now())
     }
 
-    /** Checks whether the user has already been notified about this exact official tariff pair. */
+    /** Проверяет, был ли пользователь уже уведомлён именно об этой официальной паре тарифов. */
     fun wasTariffAlertSent(userId: Long, tariffs: Tariffs): Boolean = connect().use { connection ->
         connection.prepareStatement(
             """
@@ -246,7 +246,7 @@ class JdbcRepository(
         }
     }
 
-    /** Records successful tariff-alert delivery for one user. */
+    /** Фиксирует успешную доставку уведомления о тарифах одному пользователю. */
     fun markTariffAlertSent(userId: Long, tariffs: Tariffs) {
         connect().use { connection ->
             connection.prepareStatement(
@@ -268,7 +268,7 @@ class JdbcRepository(
         }
     }
 
-    /** Clears delivery markers after the official tariff pair changes. */
+    /** Очищает отметки о доставке после изменения официальной пары тарифов. */
     fun clearTariffAlerts() {
         connect().use { connection ->
             connection.createStatement().use { statement -> statement.executeUpdate("DELETE FROM tariff_alerts") }
@@ -601,19 +601,19 @@ class JdbcRepository(
     }
 }
 
-/** Contains the latest official tariff pair together with the time it was successfully retrieved. */
+/** Содержит последнюю официальную пару тарифов и время её успешного получения. */
 data class OfficialTariffSnapshot(
     val tariffs: Tariffs,
     val retrievedAt: Instant,
 )
 
-/** Describes the number of records affected by an atomic history replacement. */
+/** Описывает число записей, затронутых атомарной заменой истории. */
 data class HistoryReplacementResult(
     val removedCount: Int,
     val importedCount: Int,
 )
 
-/** Pairs a bot recipient with their currently configured tariff, which may be absent. */
+/** Связывает получателя бота с его текущим тарифом, который может отсутствовать. */
 data class UserTariffTarget(
     val profile: UserProfile,
     val tariffs: Tariffs?,
