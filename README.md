@@ -37,6 +37,37 @@ $env:ELECTRICITY_DB = "C:\data\electricity.db"
 ./gradlew.bat build
 ```
 
+## Docker и Yandex Cloud
+
+Контейнер рассчитан на один постоянно работающий экземпляр бота. SQLite находится в Docker volume, поэтому не потеряется при пересоздании контейнера. Не запускайте несколько реплик: SQLite — локальная файловая БД.
+
+### Локальный запуск контейнера
+
+```powershell
+Copy-Item .env.example .env
+# В .env укажите настоящий BOT_TOKEN
+docker compose up -d --build
+docker compose logs -f
+```
+
+Остановить контейнер без удаления данных:
+
+```powershell
+docker compose down
+```
+
+### Первый запуск на Yandex Cloud
+
+Для текущей реализации проще всего использовать небольшую Compute Cloud VM с Ubuntu и постоянным загрузочным диском. Container Registry для первого запуска не нужен.
+
+1. Создайте VM в Yandex Cloud и разрешите SSH. Боту нужен исходящий доступ по HTTPS (порт 443) к `api.telegram.org`; входящие порты для long polling не нужны.
+2. Подключитесь по SSH, установите Docker Engine и Docker Compose Plugin.
+3. Клонируйте этот репозиторий, создайте `.env` из `.env.example` и впишите токен.
+4. Выполните `docker compose up -d --build`.
+5. Проверьте `docker compose logs -f`. Данные будут храниться в Docker volume на диске VM.
+
+Для автоматических развёртываний образ можно собрать и отправить в Yandex Container Registry, а VM настроить на его скачивание. Это не обязательно, пока обновления редки.
+
 ## Структура
 
 - `domain` — модели, парсинг, расчёт и формирование сообщений;

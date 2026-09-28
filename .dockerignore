@@ -1,0 +1,12 @@
+.git
+.gradle
+.idea
+build
+data
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.env
+БЮДЖЕТ СНТ СОКОЛЬНИКИ.xlsx
+

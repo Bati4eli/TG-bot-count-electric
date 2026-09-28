@@ -1,0 +1,13 @@
+services:
+  electricity-bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?Set BOT_TOKEN in .env}
+      ELECTRICITY_DB: /app/data/electricity.db
+    volumes:
+      - electricity_data:/app/data
+
+volumes:
+  electricity_data:
+

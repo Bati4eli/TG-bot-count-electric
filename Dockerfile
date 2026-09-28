@@ -1,0 +1,25 @@
+FROM gradle:9.2.0-jdk25 AS build
+
+WORKDIR /workspace
+
+COPY gradle gradle
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+RUN chmod +x gradlew
+
+COPY src src
+RUN gradle installDist --no-daemon
+
+FROM eclipse-temurin:25-jre
+
+RUN groupadd --system bot && useradd --system --gid bot --create-home bot
+WORKDIR /app
+
+COPY --from=build --chown=bot:bot /workspace/build/install/tg-bot-count-electric ./
+RUN mkdir /app/data && chown bot:bot /app/data
+
+USER bot
+ENV ELECTRICITY_DB=/app/data/electricity.db
+
+VOLUME ["/app/data"]
+ENTRYPOINT ["bin/tg-bot-count-electric"]
+

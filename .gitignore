@@ -7,4 +7,5 @@ data/
 *.db-wal
 .idea/
 *.iml
+.env
 
