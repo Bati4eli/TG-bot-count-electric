@@ -27,13 +27,10 @@ fun main() {
     repository.migrate()
 
     val telegram = TelegramClient(config.botToken)
-    val tariffUpdates = TariffUpdateService(
-        repository,
-        RemoteTariffServiceClient(
-            requireNotNull(config.tariffServiceUri),
-            requireNotNull(config.tariffServiceToken),
-        ),
-    )
+    val tariffSource = config.tariffServiceUri?.let { uri ->
+        RemoteTariffServiceClient(uri, requireNotNull(config.tariffServiceToken))
+    }
+    val tariffUpdates = TariffUpdateService(repository, tariffSource)
     val controller = BotController(
         telegram = telegram,
         repository = repository,
@@ -42,10 +39,12 @@ fun main() {
         history = ExcelHistoryService(Path.of("шаблон.xlsx")),
         tariffUpdates = tariffUpdates,
     )
-    DailyTariffNotificationScheduler(
-        job = TariffNotificationJob(tariffUpdates, telegram),
-        clock = clock,
-    ).start()
+    tariffSource?.let {
+        DailyTariffNotificationScheduler(
+            job = TariffNotificationJob(tariffUpdates, telegram),
+            clock = clock,
+        ).start()
+    }
     BotRunner(telegram, controller, repository).runForever()
 }
 

@@ -11,11 +11,13 @@ import ru.sokolniki.electricity.persistence.UserTariffTarget
  */
 class TariffUpdateService(
     private val repository: JdbcRepository,
-    private val provider: RemoteTariffServiceClient,
+    private val provider: RemoteTariffServiceClient?,
 ) {
     /** Получает текущие официальные тарифы и возвращает пользователей, ещё не получивших уведомление. */
     fun refresh(): List<TariffAlert> {
-        val official = provider.fetch()
+        val official = requireNotNull(provider) {
+            "Не настроен адрес отдельного сервиса тарифов."
+        }.fetch()
         val previous = repository.findOfficialTariffs()
         val officialChanged = previous?.tariffs != official.tariffs
         if (officialChanged) {

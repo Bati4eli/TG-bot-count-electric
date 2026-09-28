@@ -23,8 +23,8 @@ object AppConfigLoader {
             ?: Paths.get("data", "electricity.db")
         val serviceUrl = environment["TARIFF_SERVICE_URL"]?.trim().orEmpty()
         val serviceToken = environment["TARIFF_SERVICE_TOKEN"]?.trim().orEmpty()
-        require(serviceUrl.isNotEmpty() && serviceToken.isNotEmpty()) {
-            "Необходимо задать TARIFF_SERVICE_URL и TARIFF_SERVICE_TOKEN для отдельного сервиса тарифов."
+        require(serviceUrl.isEmpty() == serviceToken.isEmpty()) {
+            "Для сервиса тарифов необходимо задать одновременно TARIFF_SERVICE_URL и TARIFF_SERVICE_TOKEN."
         }
         return AppConfig(
             botToken = token,
