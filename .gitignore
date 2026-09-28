@@ -1,0 +1,10 @@
+.gradle/
+build/
+data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.idea/
+*.iml
+
