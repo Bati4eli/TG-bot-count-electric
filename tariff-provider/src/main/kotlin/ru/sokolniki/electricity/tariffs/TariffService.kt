@@ -103,11 +103,20 @@ class TariffServiceServer(
         server.stop(0)
     }
 
-    private fun refresh() = try {
-        store.save(fetchTariffs())
-        println("Официальные тарифы успешно обновлены.")
-    } catch (error: Exception) {
-        System.err.println("Не удалось обновить официальные тарифы: ${error.message}")
+    private fun refresh() {
+        repeat(REFRESH_ATTEMPTS) { attempt ->
+            try {
+                store.save(fetchTariffs())
+                println("Официальные тарифы успешно обновлены.")
+                return
+            } catch (error: Exception) {
+                val details = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.name
+                System.err.println(
+                    "Не удалось обновить официальные тарифы, попытка ${attempt + 1}/$REFRESH_ATTEMPTS: $details",
+                )
+                error.printStackTrace(System.err)
+            }
+        }
     }
 
     private fun handleTariffs(exchange: HttpExchange) {
@@ -135,7 +144,10 @@ class TariffServiceServer(
         return Duration.between(now, if (today.isAfter(now)) today else today.plusDays(1)).toMillis()
     }
 
-    private companion object { val DAY_MILLIS = Duration.ofDays(1).toMillis() }
+    private companion object {
+        const val REFRESH_ATTEMPTS = 3
+        val DAY_MILLIS = Duration.ofDays(1).toMillis()
+    }
 }
 
 /** Запускает сервис тарифов в отдельном приложении. */
