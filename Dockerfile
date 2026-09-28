@@ -7,7 +7,9 @@ COPY gradlew build.gradle.kts settings.gradle.kts шаблон.xlsx ./
 RUN chmod +x gradlew
 
 COPY src src
-RUN gradle installDist --no-daemon
+# Kotlin daemon оставляет временный файл, который Kaniko в Amvera иногда успевает
+# увидеть уже удалённым при создании слоя. Компилируем в процессе Gradle.
+RUN gradle installDist --no-daemon -Pkotlin.compiler.execution.strategy=in-process
 
 FROM dh-mirror.gitverse.ru/eclipse-temurin:25-jre
 

@@ -6,7 +6,8 @@ COPY gradle gradle
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY shared shared
 COPY tariff-provider tariff-provider
-RUN chmod +x gradlew && gradle :tariff-provider:installDist --no-daemon
+# См. корневой Dockerfile: это исключает гонку Kaniko с временными файлами Kotlin daemon.
+RUN chmod +x gradlew && gradle :tariff-provider:installDist --no-daemon -Pkotlin.compiler.execution.strategy=in-process
 
 FROM dh-mirror.gitverse.ru/eclipse-temurin:25-jre
 
