@@ -16,6 +16,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.time.Instant
 
 /**
  * Loads first-range two-zone tariffs for a rural Moscow Region household with an electric stove.
@@ -117,4 +118,5 @@ class MosenergosbytTariffProvider {
 data class OfficialTariffs(
     val tariffs: Tariffs,
     val sourceUrl: String,
+    val retrievedAt: Instant = Instant.now(),
 )

@@ -11,6 +11,7 @@ import java.nio.file.Path
 import java.sql.Connection
 import java.sql.ResultSet
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.util.Properties
 
@@ -211,17 +212,23 @@ class JdbcRepository(
         }
     }
 
-    /** Reads the latest globally retrieved official T1/T2 pair, if a refresh has completed. */
-    fun findOfficialTariffs(): Tariffs? = connect().use { connection ->
+    /** Reads the latest globally retrieved official T1/T2 pair and its successful retrieval time. */
+    fun findOfficialTariffs(): OfficialTariffSnapshot? = connect().use { connection ->
         val t1 = readStateValue(connection, OFFICIAL_TARIFF_T1_KEY)
         val t2 = readStateValue(connection, OFFICIAL_TARIFF_T2_KEY)
-        if (t1 == null || t2 == null) null else Tariffs(t1, t2)
+        val retrievedAt = readStateValue(connection, OFFICIAL_TARIFF_RETRIEVED_AT_KEY)
+        if (t1 == null || t2 == null || retrievedAt == null) {
+            null
+        } else {
+            OfficialTariffSnapshot(Tariffs(t1, t2), Instant.ofEpochMilli(retrievedAt))
+        }
     }
 
-    /** Persists the latest globally retrieved official tariff pair. */
+    /** Persists the latest globally retrieved official tariff pair and successful retrieval time. */
     fun saveOfficialTariffs(tariffs: Tariffs) = inTransaction { connection ->
         saveStateValue(connection, OFFICIAL_TARIFF_T1_KEY, tariffs.t1Cents)
         saveStateValue(connection, OFFICIAL_TARIFF_T2_KEY, tariffs.t2Cents)
+        saveStateValue(connection, OFFICIAL_TARIFF_RETRIEVED_AT_KEY, now())
     }
 
     /** Checks whether the user has already been notified about this exact official tariff pair. */
@@ -590,8 +597,15 @@ class JdbcRepository(
     private companion object {
         const val OFFICIAL_TARIFF_T1_KEY = "official_tariff_t1_cents"
         const val OFFICIAL_TARIFF_T2_KEY = "official_tariff_t2_cents"
+        const val OFFICIAL_TARIFF_RETRIEVED_AT_KEY = "official_tariff_retrieved_at"
     }
 }
+
+/** Contains the latest official tariff pair together with the time it was successfully retrieved. */
+data class OfficialTariffSnapshot(
+    val tariffs: Tariffs,
+    val retrievedAt: Instant,
+)
 
 /** Describes the number of records affected by an atomic history replacement. */
 data class HistoryReplacementResult(

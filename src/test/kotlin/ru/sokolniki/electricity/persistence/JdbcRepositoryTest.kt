@@ -147,7 +147,8 @@ class JdbcRepositoryTest {
 
             repository.saveOfficialTariffs(official)
 
-            assertEquals(official, repository.findOfficialTariffs())
+            assertEquals(official, repository.findOfficialTariffs()?.tariffs)
+            assertEquals(clock.instant(), repository.findOfficialTariffs()?.retrievedAt)
             assertEquals(2, repository.findUsersWithActiveTariffs().size)
             assertNull(repository.findUsersWithActiveTariffs().single { it.profile.telegramUserId == 2L }.tariffs)
             assertEquals(false, repository.wasTariffAlertSent(1, official))

@@ -11,6 +11,8 @@ import ru.sokolniki.electricity.domain.UserProfile
 import ru.sokolniki.electricity.history.ExcelHistoryService
 import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.tariffs.TariffUpdateService
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /** Routes Telegram updates to setup, reading, history, and menu use cases. */
 class BotController(
@@ -127,6 +129,7 @@ class BotController(
     private fun mainMenuDescription(profile: UserProfile): String {
         val tariffs = repository.findActiveTariffs(profile.telegramUserId)
         val latest = readings.latestCalculation(profile.telegramUserId)?.current
+        val official = tariffUpdates.latest()
         val tariffText = if (tariffs == null) {
             "<i>не настроены</i>"
         } else {
@@ -137,11 +140,19 @@ class BotController(
         } else {
             "<code>${latest.date}: Т1 ${formatDecimal(latest.t1Kwh)}, Т2 ${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
         }
+        val officialText = if (official == null) {
+            "<i>ещё не получены</i>"
+        } else {
+            "<code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
+                "Т2 ${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n" +
+                "<i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
+        }
         return """
             <b>Главное меню</b>
 
             🏡 <b>Участок:</b> ${escapeHtml(profile.plotNumber)}
             ⚙️ <b>Тарифы:</b> $tariffText
+            💡 <b>Официальные тарифы:</b> $officialText
             📊 <b>Последнее показание:</b> $latestText
             🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>
             👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>
@@ -431,6 +442,12 @@ class BotController(
     private fun sendWithMenu(chatId: Long, text: String) = telegram.sendMessage(chatId, text, KeyboardFactory.main())
 
     private fun formatDecimal(value: java.math.BigDecimal): String = value.toPlainString().replace('.', ',')
+
+    private companion object {
+        val OFFICIAL_TARIFF_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter
+            .ofPattern("dd.MM.yyyy HH:mm")
+            .withZone(ZoneId.of("Europe/Moscow"))
+    }
 
     private fun escapeHtml(value: String): String = value
         .replace("&", "&amp;")

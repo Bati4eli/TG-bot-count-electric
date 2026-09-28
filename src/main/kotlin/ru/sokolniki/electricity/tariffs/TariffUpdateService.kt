@@ -17,28 +17,29 @@ class TariffUpdateService(
     fun refresh(): List<TariffAlert> {
         val official = provider.fetch()
         val previous = repository.findOfficialTariffs()
-        val officialChanged = previous != official.tariffs
+        val officialChanged = previous?.tariffs != official.tariffs
         if (officialChanged) {
-            repository.saveOfficialTariffs(official.tariffs)
             repository.clearTariffAlerts()
         }
+        repository.saveOfficialTariffs(official.tariffs)
+        val savedOfficial = requireNotNull(latest())
 
         return repository.findUsersWithActiveTariffs().mapNotNull { target ->
-            if (repository.wasTariffAlertSent(target.profile.telegramUserId, official.tariffs)) return@mapNotNull null
-            TariffAlert(target, official, previous == null, officialChanged)
+            if (repository.wasTariffAlertSent(target.profile.telegramUserId, savedOfficial.tariffs)) return@mapNotNull null
+            TariffAlert(target, savedOfficial, previous == null, officialChanged)
         }
     }
 
     /** Returns the latest retrieved official recommendation without making a network request. */
-    fun latest(): OfficialTariffs? = repository.findOfficialTariffs()?.let { tariffs ->
-        OfficialTariffs(tariffs, OFFICIAL_CALCULATOR_URL)
+    fun latest(): OfficialTariffs? = repository.findOfficialTariffs()?.let { snapshot ->
+        OfficialTariffs(snapshot.tariffs, OFFICIAL_CALCULATOR_URL, snapshot.retrievedAt)
     }
 
     /** Saves the latest recommendation as the caller's active tariff for future readings only. */
     fun applyLatestRecommendation(userId: Long): Tariffs {
         val tariffs = requireNotNull(repository.findOfficialTariffs()) {
             "Рекомендуемые тарифы ещё не загружены. Повторите попытку через минуту."
-        }
+        }.tariffs
         repository.saveActiveTariffs(userId, tariffs)
         repository.markTariffAlertSent(userId, tariffs)
         return tariffs
