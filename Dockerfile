@@ -15,7 +15,7 @@ RUN groupadd --system bot && useradd --system --gid bot --create-home bot
 WORKDIR /app
 
 COPY --from=build --chown=bot:bot /workspace/build/install/tg-bot-count-electric ./
-RUN mkdir /app/data && chown bot:bot /app/data
+RUN mkdir -p /app/data && chown bot:bot /app/data
 
 USER bot
 ENV ELECTRICITY_DB=/app/data/electricity.db
