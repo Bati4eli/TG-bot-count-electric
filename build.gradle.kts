@@ -14,12 +14,19 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation("org.apache.poi:poi-ooxml:5.5.1")
     implementation("org.xerial:sqlite-jdbc:3.53.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
+}
+
+tasks.register("buildAllJars") {
+    description = "Собирает исполняемые JAR-файлы Telegram-бота и сервиса тарифов."
+    group = "build"
+    dependsOn(tasks.jar, ":tariff-provider:jar")
 }
 
 kotlin {

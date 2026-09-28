@@ -10,7 +10,7 @@ import ru.sokolniki.electricity.telegram.BotController
 import ru.sokolniki.electricity.telegram.BotRunner
 import ru.sokolniki.electricity.telegram.TelegramClient
 import ru.sokolniki.electricity.tariffs.DailyTariffNotificationScheduler
-import ru.sokolniki.electricity.tariffs.MosenergosbytTariffProvider
+import ru.sokolniki.electricity.tariffs.RemoteTariffServiceClient
 import ru.sokolniki.electricity.tariffs.TariffNotificationJob
 import ru.sokolniki.electricity.tariffs.TariffUpdateService
 import java.nio.file.Files
@@ -27,7 +27,13 @@ fun main() {
     repository.migrate()
 
     val telegram = TelegramClient(config.botToken)
-    val tariffUpdates = TariffUpdateService(repository, MosenergosbytTariffProvider())
+    val tariffUpdates = TariffUpdateService(
+        repository,
+        RemoteTariffServiceClient(
+            requireNotNull(config.tariffServiceUri),
+            requireNotNull(config.tariffServiceToken),
+        ),
+    )
     val controller = BotController(
         telegram = telegram,
         repository = repository,

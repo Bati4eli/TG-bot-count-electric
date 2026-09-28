@@ -11,7 +11,7 @@ import ru.sokolniki.electricity.persistence.UserTariffTarget
  */
 class TariffUpdateService(
     private val repository: JdbcRepository,
-    private val provider: MosenergosbytTariffProvider,
+    private val provider: RemoteTariffServiceClient,
 ) {
     /** Получает текущие официальные тарифы и возвращает пользователей, ещё не получивших уведомление. */
     fun refresh(): List<TariffAlert> {
@@ -21,7 +21,7 @@ class TariffUpdateService(
         if (officialChanged) {
             repository.clearTariffAlerts()
         }
-        repository.saveOfficialTariffs(official.tariffs)
+        repository.saveOfficialTariffs(official.tariffs, official.retrievedAt)
         val savedOfficial = requireNotNull(latest())
 
         return repository.findUsersWithActiveTariffs().mapNotNull { target ->

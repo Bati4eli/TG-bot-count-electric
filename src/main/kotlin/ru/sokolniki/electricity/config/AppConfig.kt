@@ -2,11 +2,14 @@ package ru.sokolniki.electricity.config
 
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.net.URI
 
 /** Хранит неизменяемые настройки, необходимые для запуска бота. */
 data class AppConfig(
     val botToken: String,
     val databasePath: Path,
+    val tariffServiceUri: URI?,
+    val tariffServiceToken: String?,
 )
 
 /** Загружает настройки из переменных окружения, не раскрывая секреты в исходном коде. */
@@ -18,7 +21,17 @@ object AppConfigLoader {
             ?.takeIf { it.isNotBlank() }
             ?.let(Paths::get)
             ?: Paths.get("data", "electricity.db")
-        return AppConfig(token, databasePath)
+        val serviceUrl = environment["TARIFF_SERVICE_URL"]?.trim().orEmpty()
+        val serviceToken = environment["TARIFF_SERVICE_TOKEN"]?.trim().orEmpty()
+        require(serviceUrl.isNotEmpty() && serviceToken.isNotEmpty()) {
+            "Необходимо задать TARIFF_SERVICE_URL и TARIFF_SERVICE_TOKEN для отдельного сервиса тарифов."
+        }
+        return AppConfig(
+            botToken = token,
+            databasePath = databasePath,
+            tariffServiceUri = serviceUrl.takeIf { it.isNotEmpty() }?.let(URI::create),
+            tariffServiceToken = serviceToken.takeIf { it.isNotEmpty() },
+        )
     }
 }
 

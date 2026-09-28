@@ -225,10 +225,10 @@ class JdbcRepository(
     }
 
     /** Сохраняет последнюю официальную пару тарифов и время успешного запроса. */
-    fun saveOfficialTariffs(tariffs: Tariffs) = inTransaction { connection ->
+    fun saveOfficialTariffs(tariffs: Tariffs, retrievedAt: Instant = Instant.ofEpochMilli(now())) = inTransaction { connection ->
         saveStateValue(connection, OFFICIAL_TARIFF_T1_KEY, tariffs.t1Cents)
         saveStateValue(connection, OFFICIAL_TARIFF_T2_KEY, tariffs.t2Cents)
-        saveStateValue(connection, OFFICIAL_TARIFF_RETRIEVED_AT_KEY, now())
+        saveStateValue(connection, OFFICIAL_TARIFF_RETRIEVED_AT_KEY, retrievedAt.toEpochMilli())
     }
 
     /** Проверяет, был ли пользователь уже уведомлён именно об этой официальной паре тарифов. */
