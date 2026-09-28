@@ -21,11 +21,15 @@ class ReadingService(
         val tariffs = requireNotNull(repository.findActiveTariffs(userId)) {
             "Сначала укажите тарифы Т1 и Т2."
         }
+        val readingDate = LocalDate.now(clock)
+        require(!repository.hasReadingOnDate(userId, readingDate)) {
+            "Показание за $readingDate уже сохранено. Если нужно исправление, используйте «Изменить последнее»."
+        }
         val previous = repository.findLatestReading(userId)?.current
         val draft = MeterReading(
             id = 0,
             telegramUserId = userId,
-            date = LocalDate.now(clock),
+            date = readingDate,
             t1Hundredths = t1Hundredths,
             t2Hundredths = t2Hundredths,
             tariffs = tariffs,

@@ -68,6 +68,9 @@ class JdbcRepository(
                     "CREATE INDEX IF NOT EXISTS idx_readings_user_id ON readings(telegram_user_id, id DESC)",
                 )
                 statement.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_readings_user_date ON readings(telegram_user_id, reading_date)",
+                )
+                statement.execute(
                     """
                     CREATE TABLE IF NOT EXISTS conversation_states (
                         telegram_user_id INTEGER PRIMARY KEY,
@@ -232,6 +235,16 @@ class JdbcRepository(
             }
         }
         reading.copy(id = id)
+    }
+
+    fun hasReadingOnDate(userId: Long, date: LocalDate): Boolean = connect().use { connection ->
+        connection.prepareStatement(
+            "SELECT 1 FROM readings WHERE telegram_user_id = ? AND reading_date = ? LIMIT 1",
+        ).use { statement ->
+            statement.setLong(1, userId)
+            statement.setString(2, date.toString())
+            statement.executeQuery().use { resultSet -> resultSet.next() }
+        }
     }
 
     fun findReadings(userId: Long): List<MeterReading> = connect().use { connection ->

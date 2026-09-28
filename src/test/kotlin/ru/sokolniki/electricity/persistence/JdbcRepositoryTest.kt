@@ -29,9 +29,8 @@ class JdbcRepositoryTest {
             repository.saveProfile(UserProfile(2, 202, "2"))
             repository.saveActiveTariffs(1, Tariffs(733, 332))
             repository.saveActiveTariffs(2, Tariffs(900, 400))
+            ReadingService(repository, ElectricityCalculator(), clockAt("2026-09-27")).addReading(1, 10_000, 20_000)
             val service = ReadingService(repository, ElectricityCalculator(), clock)
-
-            service.addReading(1, 10_000, 20_000)
             service.addReading(2, 70_000, 80_000)
             val secondForFirstUser = service.addReading(1, 10_100, 20_200)
 
@@ -54,8 +53,8 @@ class JdbcRepositoryTest {
             repository.migrate()
             repository.saveProfile(UserProfile(1, 101, "1"))
             repository.saveActiveTariffs(1, Tariffs(733, 332))
+            ReadingService(repository, ElectricityCalculator(), clockAt("2026-09-27")).addReading(1, 10_000, 20_000)
             val service = ReadingService(repository, ElectricityCalculator(), clock)
-            service.addReading(1, 10_000, 20_000)
             service.addReading(1, 12_000, 23_000)
 
             assertFailsWith<IllegalArgumentException> {
@@ -100,5 +99,35 @@ class JdbcRepositoryTest {
             Files.deleteIfExists(database)
         }
     }
+
+    @Test
+    fun `rejects a second reading for the same user and date`() {
+        val database = Files.createTempFile("electricity-date-test", ".db")
+        try {
+            val repository = JdbcRepository(database, clock)
+            repository.migrate()
+            repository.saveProfile(UserProfile(1, 101, "1"))
+            repository.saveActiveTariffs(1, Tariffs(733, 332))
+            val service = ReadingService(repository, ElectricityCalculator(), clock)
+
+            service.addReading(1, 10_000, 20_000)
+            val error = assertFailsWith<IllegalArgumentException> {
+                service.addReading(1, 10_100, 20_200)
+            }
+
+            assertEquals(
+                "Показание за 2026-09-28 уже сохранено. Если нужно исправление, используйте «Изменить последнее».",
+                error.message,
+            )
+            assertEquals(1, repository.countReadings(1))
+        } finally {
+            Files.deleteIfExists(database)
+        }
+    }
+
+    private fun clockAt(date: String): Clock = Clock.fixed(
+        Instant.parse("${date}T12:00:00Z"),
+        ZoneOffset.UTC,
+    )
 }
 
