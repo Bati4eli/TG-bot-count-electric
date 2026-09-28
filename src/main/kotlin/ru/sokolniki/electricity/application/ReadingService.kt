@@ -12,6 +12,9 @@ import ru.sokolniki.electricity.persistence.HistoryReplacementResult
 import java.time.Clock
 import java.time.LocalDate
 
+/**
+ * Implements use cases for adding, editing, exporting, and replacing a user's meter-reading history.
+ */
 class ReadingService(
     private val repository: JdbcRepository,
     private val calculator: ElectricityCalculator,

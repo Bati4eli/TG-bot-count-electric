@@ -23,6 +23,16 @@ class KeyboardFactoryTest {
 
         assertEquals(true, rows.flatten().contains(ButtonText.DOWNLOAD_HISTORY))
         assertEquals(true, rows.flatten().contains(ButtonText.UPLOAD_HISTORY))
+        assertEquals(true, rows.flatten().contains(ButtonText.OFFICIAL_TARIFFS))
+    }
+
+    @Test
+    fun `recommended tariff button uses explicit callback`() {
+        val markup = KeyboardFactory.applyRecommendedTariffs(ru.sokolniki.electricity.domain.Tariffs(773, 332))
+        val button = markup["inline_keyboard"]!!.jsonArray[0].jsonArray[0].jsonObject
+
+        assertEquals("tariffs:apply_recommended", button["callback_data"]!!.jsonPrimitive.content)
+        assertEquals("Применить Т1 7,73 ₽ · Т2 3,32 ₽", button["text"]!!.jsonPrimitive.content)
     }
 }
 

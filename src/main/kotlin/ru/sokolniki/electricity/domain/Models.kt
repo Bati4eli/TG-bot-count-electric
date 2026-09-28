@@ -3,12 +3,14 @@ package ru.sokolniki.electricity.domain
 import java.math.BigDecimal
 import java.time.LocalDate
 
+/** Identifies a Telegram user and their assigned garden plot. */
 data class UserProfile(
     val telegramUserId: Long,
     val chatId: Long,
     val plotNumber: String,
 )
 
+/** Stores T1 and T2 electricity prices in kopecks per kWh. */
 data class Tariffs(
     val t1Cents: Long,
     val t2Cents: Long,
@@ -22,6 +24,7 @@ data class Tariffs(
     val t2Rubles: BigDecimal get() = BigDecimal.valueOf(t2Cents, 2)
 }
 
+/** Stores one dated meter snapshot with the tariffs that applied to it. */
 data class MeterReading(
     val id: Long,
     val telegramUserId: Long,
@@ -39,6 +42,7 @@ data class MeterReading(
     val t2Kwh: BigDecimal get() = BigDecimal.valueOf(t2Hundredths, 2)
 }
 
+/** Represents one validated row from the Excel history import. */
 data class HistoryEntry(
     val date: LocalDate,
     val t1Hundredths: Long,
@@ -51,6 +55,7 @@ data class HistoryEntry(
     }
 }
 
+/** Contains energy consumed in each tariff zone between two readings. */
 data class Consumption(
     val t1Kwh: BigDecimal,
     val t2Kwh: BigDecimal,
@@ -58,6 +63,7 @@ data class Consumption(
     val totalKwh: BigDecimal get() = t1Kwh + t2Kwh
 }
 
+/** Combines a reading with its calculated consumption and rounded payment. */
 data class ReadingCalculation(
     val current: MeterReading,
     val previous: MeterReading?,
@@ -65,11 +71,13 @@ data class ReadingCalculation(
     val paymentRubles: Long,
 )
 
+/** Holds the most recent reading and the reading immediately before it. */
 data class LatestReading(
     val current: MeterReading,
     val previous: MeterReading?,
 )
 
+/** Enumerates the bot dialogue states persisted for a user. */
 enum class ConversationStep {
     IDLE,
     SETUP_PLOT,
@@ -87,11 +95,13 @@ enum class ConversationStep {
     IMPORT_HISTORY,
 }
 
+/** Stores the current dialogue step and an optional intermediate numeric value. */
 data class ConversationState(
     val step: ConversationStep,
     val draftValue: Long? = null,
 )
 
+/** Enumerates the parts of the latest reading that a user may edit. */
 enum class EditableField {
     READING_T1,
     READING_T2,

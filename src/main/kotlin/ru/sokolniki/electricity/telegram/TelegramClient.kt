@@ -18,6 +18,7 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.UUID
 
+/** Represents the message fields from a Telegram update that the bot needs. */
 data class IncomingMessage(
     val userId: Long,
     val chatId: Long,
@@ -25,12 +26,14 @@ data class IncomingMessage(
     val document: IncomingDocument? = null,
 )
 
+/** Describes a document attached to an incoming Telegram message. */
 data class IncomingDocument(
     val fileId: String,
     val fileName: String?,
     val fileSize: Long?,
 )
 
+/** Represents an inline-keyboard callback received from Telegram. */
 data class IncomingCallback(
     val id: String,
     val userId: Long,
@@ -38,12 +41,14 @@ data class IncomingCallback(
     val data: String?,
 )
 
+/** Represents the supported parts of a Telegram update. */
 data class IncomingUpdate(
     val updateId: Long,
     val message: IncomingMessage? = null,
     val callback: IncomingCallback? = null,
 )
 
+/** Minimal HTTP client for the Telegram Bot API and Telegram file downloads. */
 class TelegramClient(private val token: String) {
     private val apiBase = URI.create("https://api.telegram.org/bot$token/")
     private val fileApiBase = "https://api.telegram.org/file/bot$token/"
@@ -202,6 +207,7 @@ class TelegramClient(private val token: String) {
     }
 }
 
+/** Runs long polling, dispatches updates, and stores the last processed update identifier. */
 class BotRunner(
     private val telegram: TelegramClient,
     private val controller: BotController,

@@ -3,6 +3,7 @@ package ru.sokolniki.electricity.domain
 import java.math.BigDecimal
 import java.math.RoundingMode
 
+/** Calculates consumption and monthly payment for a pair of consecutive meter readings. */
 class ElectricityCalculator {
     fun calculate(current: MeterReading, previous: MeterReading?): ReadingCalculation {
         val consumption = if (previous == null) {

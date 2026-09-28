@@ -134,6 +134,35 @@ class JdbcRepositoryTest {
         }
     }
 
+    @Test
+    fun `stores official tariffs and notification markers independently from user tariffs`() {
+        val database = Files.createTempFile("electricity-tariff-alert-test", ".db")
+        try {
+            val repository = JdbcRepository(database, clock)
+            repository.migrate()
+            repository.saveProfile(UserProfile(1, 101, "1"))
+            repository.saveProfile(UserProfile(2, 202, "2"))
+            repository.saveActiveTariffs(1, Tariffs(700, 300))
+            val official = Tariffs(773, 332)
+
+            repository.saveOfficialTariffs(official)
+
+            assertEquals(official, repository.findOfficialTariffs())
+            assertEquals(2, repository.findUsersWithActiveTariffs().size)
+            assertNull(repository.findUsersWithActiveTariffs().single { it.profile.telegramUserId == 2L }.tariffs)
+            assertEquals(false, repository.wasTariffAlertSent(1, official))
+
+            repository.markTariffAlertSent(1, official)
+            assertEquals(true, repository.wasTariffAlertSent(1, official))
+            assertEquals(Tariffs(700, 300), repository.findActiveTariffs(1))
+
+            repository.clearTariffAlerts()
+            assertEquals(false, repository.wasTariffAlertSent(1, official))
+        } finally {
+            Files.deleteIfExists(database)
+        }
+    }
+
     private fun clockAt(date: String): Clock = Clock.fixed(
         Instant.parse("${date}T12:00:00Z"),
         ZoneOffset.UTC,

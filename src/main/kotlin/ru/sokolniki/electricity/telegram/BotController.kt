@@ -10,13 +10,16 @@ import ru.sokolniki.electricity.domain.Tariffs
 import ru.sokolniki.electricity.domain.UserProfile
 import ru.sokolniki.electricity.history.ExcelHistoryService
 import ru.sokolniki.electricity.persistence.JdbcRepository
+import ru.sokolniki.electricity.tariffs.TariffUpdateService
 
+/** Routes Telegram updates to setup, reading, history, and menu use cases. */
 class BotController(
     private val telegram: TelegramClient,
     private val repository: JdbcRepository,
     private val readings: ReadingService,
     private val messages: MessageFormatter,
     private val history: ExcelHistoryService,
+    private val tariffUpdates: TariffUpdateService,
 ) {
     fun handle(update: IncomingUpdate) {
         update.message?.let {
@@ -51,6 +54,10 @@ class BotController(
             }
             ButtonText.TARIFFS -> {
                 startTariffChange(message.userId, message.chatId)
+                return
+            }
+            ButtonText.OFFICIAL_TARIFFS -> {
+                showOfficialTariffs(message.userId, message.chatId)
                 return
             }
             ButtonText.EDIT_LAST -> {
@@ -103,6 +110,7 @@ class BotController(
             "edit:reading_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T2, "Введите новое показание Т2.")
             "edit:tariff_t1" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_TARIFF_T1, "Введите новый тариф Т1 в рублях за кВт·ч.")
             "edit:tariff_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_TARIFF_T2, "Введите новый тариф Т2 в рублях за кВт·ч.")
+            "tariffs:apply_recommended" -> applyRecommendedTariffs(callback.userId, chatId)
         }
     }
 
@@ -155,6 +163,40 @@ class BotController(
         if (!isConfigured(userId, chatId)) return
         repository.saveState(userId, ConversationState(ConversationStep.TARIFF_T1))
         telegram.sendMessage(chatId, "Введите тариф Т1 в рублях за кВт·ч.", KeyboardFactory.setup())
+    }
+
+    private fun showOfficialTariffs(userId: Long, chatId: Long) {
+        if (!isConfigured(userId, chatId)) return
+        val official = tariffUpdates.latest()
+        if (official == null) {
+            sendWithMenu(chatId, "Актуальные тарифы ещё загружаются. Повторите попытку через минуту.")
+            return
+        }
+        telegram.sendMessage(
+            chatId,
+            "💡 <b>Рекомендуемые тарифы</b>\n\n" +
+                "Т1: <code>${formatDecimal(official.tariffs.t1Rubles)} ₽</code>\n" +
+                "Т2: <code>${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n\n" +
+                "Московская область · сельский тариф · электроплита · 2 зоны · диапазон 1.\n" +
+                "<a href=\"${official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>\n\n" +
+                "Применение изменит тарифы только для следующих показаний.",
+            KeyboardFactory.applyRecommendedTariffs(official.tariffs),
+            parseMode = "HTML",
+        )
+    }
+
+    private fun applyRecommendedTariffs(userId: Long, chatId: Long) {
+        try {
+            val tariffs = tariffUpdates.applyLatestRecommendation(userId)
+            sendWithMenu(
+                chatId,
+                "✅ Рекомендуемые тарифы применены для следующих показаний: " +
+                    "Т1 ${formatDecimal(tariffs.t1Rubles)} ₽ · Т2 ${formatDecimal(tariffs.t2Rubles)} ₽.\n\n" +
+                    "История и сохранённые показания не изменены.",
+            )
+        } catch (error: IllegalArgumentException) {
+            sendWithMenu(chatId, error.message ?: "Не удалось применить рекомендуемые тарифы.")
+        }
     }
 
     private fun startPlotEdit(userId: Long, chatId: Long) {

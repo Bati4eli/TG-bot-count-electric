@@ -17,6 +17,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
 
+/** Imports validated personal history from, and exports it to, the supported Excel template. */
 class ExcelHistoryService(
     private val templatePath: Path,
 ) {

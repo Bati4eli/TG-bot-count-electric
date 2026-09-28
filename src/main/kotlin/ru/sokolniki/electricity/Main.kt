@@ -9,6 +9,10 @@ import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.telegram.BotController
 import ru.sokolniki.electricity.telegram.BotRunner
 import ru.sokolniki.electricity.telegram.TelegramClient
+import ru.sokolniki.electricity.tariffs.DailyTariffNotificationScheduler
+import ru.sokolniki.electricity.tariffs.MosenergosbytTariffProvider
+import ru.sokolniki.electricity.tariffs.TariffNotificationJob
+import ru.sokolniki.electricity.tariffs.TariffUpdateService
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Clock
@@ -23,13 +27,19 @@ fun main() {
     repository.migrate()
 
     val telegram = TelegramClient(config.botToken)
+    val tariffUpdates = TariffUpdateService(repository, MosenergosbytTariffProvider())
     val controller = BotController(
         telegram = telegram,
         repository = repository,
         readings = ReadingService(repository, ElectricityCalculator(), clock),
         messages = MessageFormatter(),
         history = ExcelHistoryService(Path.of("шаблон.xlsx")),
+        tariffUpdates = tariffUpdates,
     )
+    DailyTariffNotificationScheduler(
+        job = TariffNotificationJob(tariffUpdates, telegram),
+        clock = clock,
+    ).start()
     BotRunner(telegram, controller, repository).runForever()
 }
 

@@ -5,10 +5,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import ru.sokolniki.electricity.domain.Tariffs
+import java.math.BigDecimal
 
+/** Stores text labels used by reply keyboards and command handling. */
 object ButtonText {
     const val ADD_READING = "➕ Внести показания"
     const val TARIFFS = "⚙️ Тарифы"
+    const val OFFICIAL_TARIFFS = "💡 Актуальные тарифы"
     const val EDIT_LAST = "✏️ Изменить последнее"
     const val LAST_READING = "📊 Последнее показание"
     const val DOWNLOAD_HISTORY = "📥 Скачать историю Excel"
@@ -19,10 +23,12 @@ object ButtonText {
     const val MENU = "◀️ Меню"
 }
 
+/** Creates Telegram reply and inline keyboards used by the bot conversation. */
 object KeyboardFactory {
     fun main(): JsonObject = replyKeyboard(
         listOf(
             listOf(ButtonText.ADD_READING, ButtonText.TARIFFS),
+            listOf(ButtonText.OFFICIAL_TARIFFS),
             listOf(ButtonText.EDIT_LAST, ButtonText.LAST_READING),
             listOf(ButtonText.DOWNLOAD_HISTORY),
             listOf(ButtonText.UPLOAD_HISTORY),
@@ -60,6 +66,18 @@ object KeyboardFactory {
         }
     }
 
+    /** Creates the explicit user action that adopts the latest official tariff pair. */
+    fun applyRecommendedTariffs(tariffs: Tariffs): JsonObject = buildJsonObject {
+        put("inline_keyboard", buildJsonArray {
+            add(buildJsonArray {
+                add(buildJsonObject {
+                    put("text", JsonPrimitive("Применить Т1 ${format(tariffs.t1Cents)} · Т2 ${format(tariffs.t2Cents)}"))
+                    put("callback_data", JsonPrimitive("tariffs:apply_recommended"))
+                })
+            })
+        })
+    }
+
     private fun replyKeyboard(rows: List<List<String>>): JsonObject = buildJsonObject {
         put("keyboard", rows.toJsonRows())
         put("resize_keyboard", JsonPrimitive(true))
@@ -71,6 +89,8 @@ object KeyboardFactory {
             add(buildJsonArray { row.forEach { add(JsonPrimitive(it)) } })
         }
     }
+
+    private fun format(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',') + " ₽"
 
     private fun callbackRow(
         firstText: String,

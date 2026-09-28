@@ -14,6 +14,7 @@ import java.time.Clock
 import java.time.LocalDate
 import java.util.Properties
 
+/** Persists isolated Telegram-user data and bot state in the local SQLite database. */
 class JdbcRepository(
     private val databasePath: Path,
     private val clock: Clock = Clock.systemUTC(),
@@ -69,6 +70,17 @@ class JdbcRepository(
                 )
                 statement.execute(
                     "CREATE UNIQUE INDEX IF NOT EXISTS idx_readings_user_date ON readings(telegram_user_id, reading_date)",
+                )
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS tariff_alerts (
+                        telegram_user_id INTEGER PRIMARY KEY,
+                        tariff_t1_cents INTEGER NOT NULL,
+                        tariff_t2_cents INTEGER NOT NULL,
+                        sent_at INTEGER NOT NULL,
+                        FOREIGN KEY (telegram_user_id) REFERENCES user_profiles(telegram_user_id)
+                    )
+                    """.trimIndent(),
                 )
                 statement.execute(
                     """
@@ -165,6 +177,94 @@ class JdbcRepository(
                     null
                 }
             }
+        }
+    }
+
+    /** Returns profiles together with their optional active tariffs for tariff-change notifications. */
+    fun findUsersWithActiveTariffs(): List<UserTariffTarget> = connect().use { connection ->
+        connection.prepareStatement(
+            """
+            SELECT p.telegram_user_id, p.chat_id, p.plot_number, t.t1_cents, t.t2_cents
+            FROM user_profiles p
+            LEFT JOIN active_tariffs t ON t.telegram_user_id = p.telegram_user_id
+            """.trimIndent(),
+        ).use { statement ->
+            statement.executeQuery().use { resultSet ->
+                buildList {
+                    while (resultSet.next()) {
+                        val tariffs = resultSet.getLong("t1_cents").takeUnless { resultSet.wasNull() }?.let { t1 ->
+                            Tariffs(t1, resultSet.getLong("t2_cents"))
+                        }
+                        add(
+                            UserTariffTarget(
+                                profile = UserProfile(
+                                    telegramUserId = resultSet.getLong("telegram_user_id"),
+                                    chatId = resultSet.getLong("chat_id"),
+                                    plotNumber = resultSet.getString("plot_number"),
+                                ),
+                                tariffs = tariffs,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Reads the latest globally retrieved official T1/T2 pair, if a refresh has completed. */
+    fun findOfficialTariffs(): Tariffs? = connect().use { connection ->
+        val t1 = readStateValue(connection, OFFICIAL_TARIFF_T1_KEY)
+        val t2 = readStateValue(connection, OFFICIAL_TARIFF_T2_KEY)
+        if (t1 == null || t2 == null) null else Tariffs(t1, t2)
+    }
+
+    /** Persists the latest globally retrieved official tariff pair. */
+    fun saveOfficialTariffs(tariffs: Tariffs) = inTransaction { connection ->
+        saveStateValue(connection, OFFICIAL_TARIFF_T1_KEY, tariffs.t1Cents)
+        saveStateValue(connection, OFFICIAL_TARIFF_T2_KEY, tariffs.t2Cents)
+    }
+
+    /** Checks whether the user has already been notified about this exact official tariff pair. */
+    fun wasTariffAlertSent(userId: Long, tariffs: Tariffs): Boolean = connect().use { connection ->
+        connection.prepareStatement(
+            """
+            SELECT 1 FROM tariff_alerts
+            WHERE telegram_user_id = ? AND tariff_t1_cents = ? AND tariff_t2_cents = ?
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setLong(1, userId)
+            statement.setLong(2, tariffs.t1Cents)
+            statement.setLong(3, tariffs.t2Cents)
+            statement.executeQuery().use { resultSet -> resultSet.next() }
+        }
+    }
+
+    /** Records successful tariff-alert delivery for one user. */
+    fun markTariffAlertSent(userId: Long, tariffs: Tariffs) {
+        connect().use { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO tariff_alerts(telegram_user_id, tariff_t1_cents, tariff_t2_cents, sent_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(telegram_user_id) DO UPDATE SET
+                    tariff_t1_cents = excluded.tariff_t1_cents,
+                    tariff_t2_cents = excluded.tariff_t2_cents,
+                    sent_at = excluded.sent_at
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setLong(1, userId)
+                statement.setLong(2, tariffs.t1Cents)
+                statement.setLong(3, tariffs.t2Cents)
+                statement.setLong(4, now())
+                statement.executeUpdate()
+            }
+        }
+    }
+
+    /** Clears delivery markers after the official tariff pair changes. */
+    fun clearTariffAlerts() {
+        connect().use { connection ->
+            connection.createStatement().use { statement -> statement.executeUpdate("DELETE FROM tariff_alerts") }
         }
     }
 
@@ -429,6 +529,34 @@ class JdbcRepository(
             statement.setLong(4, now())
             statement.executeUpdate()
         }
+        clearTariffAlert(connection, userId)
+    }
+
+    private fun clearTariffAlert(connection: Connection, userId: Long) {
+        connection.prepareStatement("DELETE FROM tariff_alerts WHERE telegram_user_id = ?").use { statement ->
+            statement.setLong(1, userId)
+            statement.executeUpdate()
+        }
+    }
+
+    private fun readStateValue(connection: Connection, key: String): Long? = connection.prepareStatement(
+        "SELECT state_value FROM bot_state WHERE state_key = ?",
+    ).use { statement ->
+        statement.setString(1, key)
+        statement.executeQuery().use { resultSet -> if (resultSet.next()) resultSet.getLong(1) else null }
+    }
+
+    private fun saveStateValue(connection: Connection, key: String, value: Long) {
+        connection.prepareStatement(
+            """
+            INSERT INTO bot_state(state_key, state_value) VALUES (?, ?)
+            ON CONFLICT(state_key) DO UPDATE SET state_value = excluded.state_value
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, key)
+            statement.setLong(2, value)
+            statement.executeUpdate()
+        }
     }
 
     private fun ResultSet.toReading(): MeterReading = MeterReading(
@@ -458,10 +586,22 @@ class JdbcRepository(
     }
 
     private fun now(): Long = clock.instant().toEpochMilli()
+
+    private companion object {
+        const val OFFICIAL_TARIFF_T1_KEY = "official_tariff_t1_cents"
+        const val OFFICIAL_TARIFF_T2_KEY = "official_tariff_t2_cents"
+    }
 }
 
+/** Describes the number of records affected by an atomic history replacement. */
 data class HistoryReplacementResult(
     val removedCount: Int,
     val importedCount: Int,
+)
+
+/** Pairs a bot recipient with their currently configured tariff, which may be absent. */
+data class UserTariffTarget(
+    val profile: UserProfile,
+    val tariffs: Tariffs?,
 )
 

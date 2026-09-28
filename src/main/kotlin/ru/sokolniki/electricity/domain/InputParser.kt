@@ -3,6 +3,7 @@ package ru.sokolniki.electricity.domain
 import java.math.BigDecimal
 import java.math.RoundingMode
 
+/** Validates and converts textual Telegram input into the exact integer values used by the domain. */
 object InputParser {
     private val decimalPattern = Regex("\\d+(?:[,.]\\d{1,2})?")
     private const val MAX_READING_HUNDREDTHS = 99_999_999_999L

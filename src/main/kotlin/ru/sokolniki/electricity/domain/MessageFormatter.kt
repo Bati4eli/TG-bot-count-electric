@@ -4,6 +4,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.format.DateTimeFormatter
 
+/** Builds user-facing summaries and copyable payment messages from calculated readings. */
 class MessageFormatter {
     private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
