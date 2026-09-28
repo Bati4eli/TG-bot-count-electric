@@ -15,5 +15,14 @@ class KeyboardFactoryTest {
         assertEquals("Скопировать", button["text"]!!.jsonPrimitive.content)
         assertEquals("Текст для банка", button["copy_text"]!!.jsonObject["text"]!!.jsonPrimitive.content)
     }
+
+    @Test
+    fun `main keyboard contains history export and import actions`() {
+        val rows = KeyboardFactory.main()["keyboard"]!!.jsonArray
+            .map { row -> row.jsonArray.map { it.jsonPrimitive.content } }
+
+        assertEquals(true, rows.flatten().contains(ButtonText.DOWNLOAD_HISTORY))
+        assertEquals(true, rows.flatten().contains(ButtonText.UPLOAD_HISTORY))
+    }
 }
 

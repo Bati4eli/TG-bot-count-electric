@@ -16,11 +16,19 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.UUID
 
 data class IncomingMessage(
     val userId: Long,
     val chatId: Long,
     val text: String?,
+    val document: IncomingDocument? = null,
+)
+
+data class IncomingDocument(
+    val fileId: String,
+    val fileName: String?,
+    val fileSize: Long?,
 )
 
 data class IncomingCallback(
@@ -36,8 +44,9 @@ data class IncomingUpdate(
     val callback: IncomingCallback? = null,
 )
 
-class TelegramClient(token: String) {
+class TelegramClient(private val token: String) {
     private val apiBase = URI.create("https://api.telegram.org/bot$token/")
+    private val fileApiBase = "https://api.telegram.org/file/bot$token/"
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(15))
         .build()
@@ -56,7 +65,7 @@ class TelegramClient(token: String) {
         return result.mapNotNull(::parseUpdate)
     }
 
-    fun sendMessage(chatId: Long, text: String, replyMarkup: JsonObject? = null) {
+    fun sendMessage(chatId: Long, text: String, replyMarkup: JsonObject? = null, parseMode: String? = null) {
         require(text.length <= 4096) { "Текст Telegram-сообщения превышает 4096 символов." }
         call(
             "sendMessage",
@@ -64,8 +73,54 @@ class TelegramClient(token: String) {
                 put("chat_id", JsonPrimitive(chatId))
                 put("text", JsonPrimitive(text))
                 replyMarkup?.let { put("reply_markup", it) }
+                parseMode?.let { put("parse_mode", JsonPrimitive(it)) }
             },
         )
+    }
+
+    fun sendDocument(
+        chatId: Long,
+        fileName: String,
+        bytes: ByteArray,
+        caption: String,
+        replyMarkup: JsonObject? = null,
+    ) {
+        require(bytes.isNotEmpty()) { "Нельзя отправить пустой файл." }
+        require(bytes.size <= MAX_DOCUMENT_SIZE_BYTES) { "Файл истории слишком большой." }
+        val boundary = "----ElectricityBot${UUID.randomUUID()}"
+        val body = buildMultipartBody(
+            boundary = boundary,
+            fields = buildMap {
+                put("chat_id", chatId.toString())
+                put("caption", caption)
+                replyMarkup?.let { put("reply_markup", it.toString()) }
+            },
+            fileName = fileName,
+            bytes = bytes,
+        )
+        val request = HttpRequest.newBuilder(apiBase.resolve("sendDocument"))
+            .timeout(Duration.ofSeconds(40))
+            .header("Content-Type", "multipart/form-data; boundary=$boundary")
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+            .build()
+        parseResponse(httpClient.send(request, HttpResponse.BodyHandlers.ofString()))
+    }
+
+    fun downloadDocument(document: IncomingDocument): ByteArray {
+        document.fileSize?.let { size ->
+            require(size <= MAX_DOCUMENT_SIZE_BYTES) { "Файл слишком большой. Максимум: 5 МБ." }
+        }
+        val result = call("getFile", buildJsonObject { put("file_id", JsonPrimitive(document.fileId)) })
+        val filePath = result["result"]?.jsonObject?.get("file_path")?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("Telegram не вернул путь к файлу.")
+        val request = HttpRequest.newBuilder(URI.create(fileApiBase + filePath))
+            .timeout(Duration.ofSeconds(40))
+            .GET()
+            .build()
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray())
+        check(response.statusCode() in 200..299) { "Не удалось скачать файл из Telegram." }
+        require(response.body().size <= MAX_DOCUMENT_SIZE_BYTES) { "Файл слишком большой. Максимум: 5 МБ." }
+        return response.body()
     }
 
     fun answerCallback(callbackId: String) {
@@ -78,13 +133,38 @@ class TelegramClient(token: String) {
             .header("Content-Type", "application/json; charset=utf-8")
             .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
             .build()
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        return parseResponse(httpClient.send(request, HttpResponse.BodyHandlers.ofString()))
+    }
+
+    private fun parseResponse(response: HttpResponse<String>): JsonObject {
         check(response.statusCode() in 200..299) { "Telegram API вернул HTTP ${response.statusCode()}." }
         val body = json.parseToJsonElement(response.body()).jsonObject
         check(body["ok"]?.jsonPrimitive?.content == "true") {
             "Telegram API: ${body["description"]?.jsonPrimitive?.content ?: "неизвестная ошибка"}"
         }
         return body
+    }
+
+    private fun buildMultipartBody(
+        boundary: String,
+        fields: Map<String, String>,
+        fileName: String,
+        bytes: ByteArray,
+    ): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+        fun writeText(value: String) = output.write(value.toByteArray(Charsets.UTF_8))
+        fields.forEach { (name, value) ->
+            writeText("--$boundary\r\n")
+            writeText("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
+            writeText(value)
+            writeText("\r\n")
+        }
+        writeText("--$boundary\r\n")
+        writeText("Content-Disposition: form-data; name=\"document\"; filename=\"$fileName\"\r\n")
+        writeText("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n")
+        output.write(bytes)
+        writeText("\r\n--$boundary--\r\n")
+        return output.toByteArray()
     }
 
     private fun parseUpdate(element: kotlinx.serialization.json.JsonElement): IncomingUpdate? {
@@ -102,7 +182,16 @@ class TelegramClient(token: String) {
     private fun JsonObject.toIncomingMessage(): IncomingMessage? {
         val userId = this["from"]?.jsonObject?.get("id")?.jsonPrimitive?.longOrNull ?: return null
         val chatId = this["chat"]?.jsonObject?.get("id")?.jsonPrimitive?.longOrNull ?: return null
-        return IncomingMessage(userId, chatId, this["text"]?.jsonPrimitive?.content)
+        val documentObject = this["document"]?.jsonObject
+        val document = documentObject?.let {
+            val fileId = it["file_id"]?.jsonPrimitive?.content ?: return@let null
+            IncomingDocument(
+                fileId = fileId,
+                fileName = it["file_name"]?.jsonPrimitive?.content,
+                fileSize = it["file_size"]?.jsonPrimitive?.longOrNull,
+            )
+        }
+        return IncomingMessage(userId, chatId, this["text"]?.jsonPrimitive?.content, document)
     }
 
     private fun JsonObject.toIncomingCallback(): IncomingCallback? {
@@ -140,4 +229,6 @@ class BotRunner(
         }
     }
 }
+
+private const val MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024
 

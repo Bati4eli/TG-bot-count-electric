@@ -8,6 +8,7 @@ import ru.sokolniki.electricity.domain.InputParser
 import ru.sokolniki.electricity.domain.MessageFormatter
 import ru.sokolniki.electricity.domain.Tariffs
 import ru.sokolniki.electricity.domain.UserProfile
+import ru.sokolniki.electricity.history.ExcelHistoryService
 import ru.sokolniki.electricity.persistence.JdbcRepository
 
 class BotController(
@@ -15,6 +16,7 @@ class BotController(
     private val repository: JdbcRepository,
     private val readings: ReadingService,
     private val messages: MessageFormatter,
+    private val history: ExcelHistoryService,
 ) {
     fun handle(update: IncomingUpdate) {
         update.message?.let {
@@ -29,6 +31,10 @@ class BotController(
     }
 
     private fun handleMessage(message: IncomingMessage) {
+        if (message.document != null) {
+            handleDocument(message)
+            return
+        }
         val input = message.text?.trim().orEmpty()
         if (input.isEmpty()) return
 
@@ -53,6 +59,14 @@ class BotController(
             }
             ButtonText.LAST_READING -> {
                 showLatestReading(message.userId, message.chatId)
+                return
+            }
+            ButtonText.DOWNLOAD_HISTORY -> {
+                downloadHistory(message.userId, message.chatId)
+                return
+            }
+            ButtonText.UPLOAD_HISTORY -> {
+                startHistoryImport(message.userId, message.chatId)
                 return
             }
             ButtonText.BANK -> {
@@ -98,8 +112,32 @@ class BotController(
             repository.saveState(userId, ConversationState(ConversationStep.SETUP_PLOT))
             telegram.sendMessage(chatId, "Добро пожаловать. Введите номер вашего участка.", KeyboardFactory.setup())
         } else {
-            sendWithMenu(chatId, "Главное меню. Участок ${profile.plotNumber}.")
+            telegram.sendMessage(chatId, mainMenuDescription(profile), KeyboardFactory.main(), parseMode = "HTML")
         }
+    }
+
+    private fun mainMenuDescription(profile: UserProfile): String {
+        val tariffs = repository.findActiveTariffs(profile.telegramUserId)
+        val latest = readings.latestCalculation(profile.telegramUserId)?.current
+        val tariffText = if (tariffs == null) {
+            "<i>не настроены</i>"
+        } else {
+            "<code>Т1 ${formatDecimal(tariffs.t1Rubles)} ₽ · Т2 ${formatDecimal(tariffs.t2Rubles)} ₽</code>"
+        }
+        val latestText = if (latest == null) {
+            "<i>ещё нет</i>"
+        } else {
+            "<code>${latest.date}: Т1 ${formatDecimal(latest.t1Kwh)}, Т2 ${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
+        }
+        return """
+            <b>Главное меню</b>
+
+            🏡 <b>Участок:</b> ${escapeHtml(profile.plotNumber)}
+            ⚙️ <b>Тарифы:</b> $tariffText
+            📊 <b>Последнее показание:</b> $latestText
+            🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>
+            👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>
+        """.trimIndent()
     }
 
     private fun startReading(userId: Long, chatId: Long) {
@@ -159,6 +197,66 @@ class BotController(
         }
     }
 
+    private fun downloadHistory(userId: Long, chatId: Long) {
+        if (!isConfigured(userId, chatId)) return
+        val file = history.export(readings.historyForExport(userId))
+        telegram.sendDocument(
+            chatId = chatId,
+            fileName = "история_показаний.xlsx",
+            bytes = file,
+            caption = "История показаний. Изменяйте только строки с данными и загрузите этот файл обратно в бот.",
+            replyMarkup = KeyboardFactory.main(),
+        )
+    }
+
+    private fun startHistoryImport(userId: Long, chatId: Long) {
+        if (!isConfigured(userId, chatId)) return
+        val currentCount = repository.countReadings(userId)
+        repository.saveState(userId, ConversationState(ConversationStep.IMPORT_HISTORY))
+        telegram.sendMessage(
+            chatId,
+            "‼️ <b>ВНИМАНИЕ: импорт полностью заменит историю.</b>\n\n" +
+                "Будут удалены все текущие записи пользователя: <b>$currentCount</b>. " +
+                "Затем бот сохранит только строки из Excel-файла.\n\n" +
+                "Отправьте сюда файл <b>.xlsx</b>, ранее скачанный кнопкой «${ButtonText.DOWNLOAD_HISTORY}». " +
+                "Перед заменой бот проверит структуру, заполнение, порядок дат и рост показаний Т1/Т2. " +
+                "Для отмены нажмите «${ButtonText.MENU}» или отправьте /cancel.",
+            KeyboardFactory.setup(),
+            parseMode = "HTML",
+        )
+    }
+
+    private fun handleDocument(message: IncomingMessage) {
+        if (repository.stateFor(message.userId).step != ConversationStep.IMPORT_HISTORY) {
+            sendWithMenu(message.chatId, "Чтобы загрузить историю, сначала нажмите «${ButtonText.UPLOAD_HISTORY}».")
+            return
+        }
+        val document = message.document ?: return
+        try {
+            require(document.fileName?.lowercase(java.util.Locale.ROOT)?.endsWith(".xlsx") == true) {
+                "Нужен файл Excel формата .xlsx."
+            }
+            val bytes = telegram.downloadDocument(document)
+            val entries = history.import(bytes)
+            val result = readings.replaceHistory(message.userId, entries)
+            repository.clearState(message.userId)
+            sendWithMenu(
+                message.chatId,
+                "✅ История успешно заменена.\n\n" +
+                    "Лог импорта:\n" +
+                    "• удалено прежних записей: ${result.removedCount}\n" +
+                    "• загружено записей из Excel: ${result.importedCount}\n" +
+                    "• активные тарифы взяты из последней строки файла.",
+            )
+        } catch (error: Exception) {
+            telegram.sendMessage(
+                message.chatId,
+                "❌ Файл не импортирован: ${error.message ?: "проверьте файл."}\n\nИстория не изменена. Исправьте файл и отправьте его снова, либо отмените операцию через /cancel.",
+                KeyboardFactory.setup(),
+            )
+        }
+    }
+
     private fun sendBankMessage(userId: Long, chatId: Long) {
         val profile = repository.findProfile(userId) ?: run {
             showMenuOrStartSetup(userId, chatId)
@@ -201,6 +299,11 @@ class BotController(
                 ConversationStep.EDIT_TARIFF_T1,
                 ConversationStep.EDIT_TARIFF_T2,
                 -> editLatest(message, state.step)
+                ConversationStep.IMPORT_HISTORY -> telegram.sendMessage(
+                    message.chatId,
+                    "Ожидаю файл .xlsx. Чтобы отменить импорт, нажмите «${ButtonText.MENU}» или отправьте /cancel.",
+                    KeyboardFactory.setup(),
+                )
                 ConversationStep.IDLE -> Unit
             }
         } catch (error: IllegalArgumentException) {
@@ -277,5 +380,12 @@ class BotController(
     }
 
     private fun sendWithMenu(chatId: Long, text: String) = telegram.sendMessage(chatId, text, KeyboardFactory.main())
+
+    private fun formatDecimal(value: java.math.BigDecimal): String = value.toPlainString().replace('.', ',')
+
+    private fun escapeHtml(value: String): String = value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
 }
 

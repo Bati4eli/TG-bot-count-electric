@@ -4,11 +4,13 @@ import ru.sokolniki.electricity.application.ReadingService
 import ru.sokolniki.electricity.config.AppConfigLoader
 import ru.sokolniki.electricity.domain.ElectricityCalculator
 import ru.sokolniki.electricity.domain.MessageFormatter
+import ru.sokolniki.electricity.history.ExcelHistoryService
 import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.telegram.BotController
 import ru.sokolniki.electricity.telegram.BotRunner
 import ru.sokolniki.electricity.telegram.TelegramClient
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Clock
 import java.time.ZoneId
 
@@ -26,6 +28,7 @@ fun main() {
         repository = repository,
         readings = ReadingService(repository, ElectricityCalculator(), clock),
         messages = MessageFormatter(),
+        history = ExcelHistoryService(Path.of("шаблон.xlsx")),
     )
     BotRunner(telegram, controller, repository).runForever()
 }

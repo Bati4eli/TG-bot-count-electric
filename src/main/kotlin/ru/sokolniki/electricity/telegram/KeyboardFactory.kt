@@ -11,6 +11,8 @@ object ButtonText {
     const val TARIFFS = "⚙️ Тарифы"
     const val EDIT_LAST = "✏️ Изменить последнее"
     const val LAST_READING = "📊 Последнее показание"
+    const val DOWNLOAD_HISTORY = "📥 Скачать историю Excel"
+    const val UPLOAD_HISTORY = "📤 Загрузить данные"
     const val BANK = "📋 Банк"
     const val CHAIRMAN = "📋 Председатель"
     const val PLOT = "🏡 Участок"
@@ -22,6 +24,8 @@ object KeyboardFactory {
         listOf(
             listOf(ButtonText.ADD_READING, ButtonText.TARIFFS),
             listOf(ButtonText.EDIT_LAST, ButtonText.LAST_READING),
+            listOf(ButtonText.DOWNLOAD_HISTORY),
+            listOf(ButtonText.UPLOAD_HISTORY),
             listOf(ButtonText.BANK, ButtonText.CHAIRMAN),
             listOf(ButtonText.PLOT, ButtonText.MENU),
         ),

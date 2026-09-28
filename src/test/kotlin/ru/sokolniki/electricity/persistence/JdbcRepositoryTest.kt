@@ -3,6 +3,7 @@ package ru.sokolniki.electricity.persistence
 import ru.sokolniki.electricity.application.ReadingService
 import ru.sokolniki.electricity.domain.EditableField
 import ru.sokolniki.electricity.domain.ElectricityCalculator
+import ru.sokolniki.electricity.domain.HistoryEntry
 import ru.sokolniki.electricity.domain.Tariffs
 import ru.sokolniki.electricity.domain.UserProfile
 import java.nio.file.Files
@@ -62,6 +63,39 @@ class JdbcRepositoryTest {
             }
 
             assertEquals(12_000, repository.findLatestReading(1)?.current?.t1Hundredths)
+        } finally {
+            Files.deleteIfExists(database)
+        }
+    }
+
+    @Test
+    fun `replaces only requesting users history and synchronizes latest tariffs`() {
+        val database = Files.createTempFile("electricity-history-test", ".db")
+        try {
+            val repository = JdbcRepository(database, clock)
+            repository.migrate()
+            repository.saveProfile(UserProfile(1, 101, "1"))
+            repository.saveProfile(UserProfile(2, 202, "2"))
+            repository.saveActiveTariffs(1, Tariffs(733, 332))
+            repository.saveActiveTariffs(2, Tariffs(900, 400))
+            val service = ReadingService(repository, ElectricityCalculator(), clock)
+            service.addReading(1, 10_000, 20_000)
+            service.addReading(2, 70_000, 80_000)
+
+            val result = service.replaceHistory(
+                1,
+                listOf(
+                    HistoryEntry(LocalDate.parse("2026-07-01"), 11_000, 21_000, Tariffs(700, 300)),
+                    HistoryEntry(LocalDate.parse("2026-08-01"), 11_100, 21_300, Tariffs(710, 310)),
+                ),
+            )
+
+            assertEquals(1, result.removedCount)
+            assertEquals(2, result.importedCount)
+            assertEquals(2, repository.findReadings(1).size)
+            assertEquals(70_000, repository.findLatestReading(2)?.current?.t1Hundredths)
+            assertEquals(710, repository.findActiveTariffs(1)?.t1Cents)
+            assertEquals(900, repository.findActiveTariffs(2)?.t1Cents)
         } finally {
             Files.deleteIfExists(database)
         }

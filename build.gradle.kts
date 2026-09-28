@@ -14,6 +14,7 @@ repositories {
 }
 
 dependencies {
+    implementation("org.apache.poi:poi-ooxml:5.5.1")
     implementation("org.xerial:sqlite-jdbc:3.53.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 

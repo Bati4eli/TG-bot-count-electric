@@ -3,7 +3,7 @@ FROM gradle:9.2.0-jdk25 AS build
 WORKDIR /workspace
 
 COPY gradle gradle
-COPY gradlew build.gradle.kts settings.gradle.kts ./
+COPY gradlew build.gradle.kts settings.gradle.kts шаблон.xlsx ./
 RUN chmod +x gradlew
 
 COPY src src
@@ -15,6 +15,7 @@ RUN groupadd --system bot && useradd --system --gid bot --create-home bot
 WORKDIR /app
 
 COPY --from=build --chown=bot:bot /workspace/build/install/tg-bot-count-electric ./
+COPY --from=build --chown=bot:bot /workspace/шаблон.xlsx ./шаблон.xlsx
 RUN mkdir -p /app/data && chown bot:bot /app/data
 
 USER bot

@@ -2,6 +2,7 @@ package ru.sokolniki.electricity.persistence
 
 import ru.sokolniki.electricity.domain.ConversationState
 import ru.sokolniki.electricity.domain.ConversationStep
+import ru.sokolniki.electricity.domain.HistoryEntry
 import ru.sokolniki.electricity.domain.LatestReading
 import ru.sokolniki.electricity.domain.MeterReading
 import ru.sokolniki.electricity.domain.Tariffs
@@ -233,6 +234,93 @@ class JdbcRepository(
         reading.copy(id = id)
     }
 
+    fun findReadings(userId: Long): List<MeterReading> = connect().use { connection ->
+        connection.prepareStatement(
+            """
+            SELECT id, telegram_user_id, reading_date, t1_hundredths, t2_hundredths,
+                   tariff_t1_cents, tariff_t2_cents
+            FROM readings
+            WHERE telegram_user_id = ?
+            ORDER BY reading_date ASC, id ASC
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setLong(1, userId)
+            statement.executeQuery().use { resultSet ->
+                buildList {
+                    while (resultSet.next()) add(resultSet.toReading())
+                }
+            }
+        }
+    }
+
+    fun countReadings(userId: Long): Int = connect().use { connection ->
+        connection.prepareStatement("SELECT COUNT(*) FROM readings WHERE telegram_user_id = ?").use { statement ->
+            statement.setLong(1, userId)
+            statement.executeQuery().use { resultSet ->
+                resultSet.next()
+                resultSet.getInt(1)
+            }
+        }
+    }
+
+    fun countUsers(): Int = connect().use { connection ->
+        connection.createStatement().use { statement ->
+            statement.executeQuery("SELECT COUNT(*) FROM user_profiles").use { resultSet ->
+                resultSet.next()
+                resultSet.getInt(1)
+            }
+        }
+    }
+
+    fun replaceHistory(userId: Long, entries: List<HistoryEntry>): HistoryReplacementResult {
+        require(entries.isNotEmpty()) { "В файле должно быть хотя бы одно показание." }
+        return inTransaction { connection ->
+            connection.prepareStatement("SELECT 1 FROM user_profiles WHERE telegram_user_id = ?").use { statement ->
+                statement.setLong(1, userId)
+                statement.executeQuery().use { resultSet ->
+                    check(resultSet.next()) { "Сначала настройте профиль пользователя." }
+                }
+            }
+            val removedCount = connection.prepareStatement(
+                "SELECT COUNT(*) FROM readings WHERE telegram_user_id = ?",
+            ).use { statement ->
+                statement.setLong(1, userId)
+                statement.executeQuery().use { resultSet ->
+                    resultSet.next()
+                    resultSet.getInt(1)
+                }
+            }
+            connection.prepareStatement("DELETE FROM readings WHERE telegram_user_id = ?").use { statement ->
+                statement.setLong(1, userId)
+                statement.executeUpdate()
+            }
+            connection.prepareStatement(
+                """
+                INSERT INTO readings(
+                    telegram_user_id, reading_date, t1_hundredths, t2_hundredths,
+                    tariff_t1_cents, tariff_t2_cents, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+            ).use { statement ->
+                entries.forEach { entry ->
+                    val timestamp = now()
+                    statement.setLong(1, userId)
+                    statement.setString(2, entry.date.toString())
+                    statement.setLong(3, entry.t1Hundredths)
+                    statement.setLong(4, entry.t2Hundredths)
+                    statement.setLong(5, entry.tariffs.t1Cents)
+                    statement.setLong(6, entry.tariffs.t2Cents)
+                    statement.setLong(7, timestamp)
+                    statement.setLong(8, timestamp)
+                    statement.addBatch()
+                }
+                statement.executeBatch()
+            }
+            saveActiveTariffs(connection, userId, entries.last().tariffs)
+            HistoryReplacementResult(removedCount = removedCount, importedCount = entries.size)
+        }
+    }
+
     fun findLatestReading(userId: Long): LatestReading? = connect().use { connection ->
         findLatestReading(connection, userId)
     }
@@ -358,4 +446,9 @@ class JdbcRepository(
 
     private fun now(): Long = clock.instant().toEpochMilli()
 }
+
+data class HistoryReplacementResult(
+    val removedCount: Int,
+    val importedCount: Int,
+)
 

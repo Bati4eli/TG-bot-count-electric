@@ -2,11 +2,13 @@ package ru.sokolniki.electricity.application
 
 import ru.sokolniki.electricity.domain.EditableField
 import ru.sokolniki.electricity.domain.ElectricityCalculator
+import ru.sokolniki.electricity.domain.HistoryEntry
 import ru.sokolniki.electricity.domain.LatestReading
 import ru.sokolniki.electricity.domain.MeterReading
 import ru.sokolniki.electricity.domain.ReadingCalculation
 import ru.sokolniki.electricity.domain.Tariffs
 import ru.sokolniki.electricity.persistence.JdbcRepository
+import ru.sokolniki.electricity.persistence.HistoryReplacementResult
 import java.time.Clock
 import java.time.LocalDate
 
@@ -34,6 +36,25 @@ class ReadingService(
     }
 
     fun latestCalculation(userId: Long): ReadingCalculation? = repository.findLatestReading(userId)?.toCalculation()
+
+    fun historyForExport(userId: Long): List<MeterReading> = repository.findReadings(userId)
+
+    fun replaceHistory(userId: Long, entries: List<HistoryEntry>): HistoryReplacementResult {
+        require(entries.isNotEmpty()) { "В файле должно быть хотя бы одно показание." }
+        entries.zipWithNext().forEachIndexed { index, (previous, current) ->
+            val rowNumber = index + 3
+            require(current.date.isAfter(previous.date)) {
+                "Строка $rowNumber: дата должна быть позже даты в предыдущей строке."
+            }
+            require(current.t1Hundredths > previous.t1Hundredths) {
+                "Строка $rowNumber: показание Т1 должно быть больше предыдущего."
+            }
+            require(current.t2Hundredths > previous.t2Hundredths) {
+                "Строка $rowNumber: показание Т2 должно быть больше предыдущего."
+            }
+        }
+        return repository.replaceHistory(userId, entries)
+    }
 
     fun updateLatest(
         userId: Long,

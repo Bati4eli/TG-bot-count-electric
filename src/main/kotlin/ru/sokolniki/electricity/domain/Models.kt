@@ -39,6 +39,18 @@ data class MeterReading(
     val t2Kwh: BigDecimal get() = BigDecimal.valueOf(t2Hundredths, 2)
 }
 
+data class HistoryEntry(
+    val date: LocalDate,
+    val t1Hundredths: Long,
+    val t2Hundredths: Long,
+    val tariffs: Tariffs,
+) {
+    init {
+        require(t1Hundredths >= 0) { "Показание Т1 не может быть отрицательным." }
+        require(t2Hundredths >= 0) { "Показание Т2 не может быть отрицательным." }
+    }
+}
+
 data class Consumption(
     val t1Kwh: BigDecimal,
     val t2Kwh: BigDecimal,
@@ -72,6 +84,7 @@ enum class ConversationStep {
     EDIT_READING_T2,
     EDIT_TARIFF_T1,
     EDIT_TARIFF_T2,
+    IMPORT_HISTORY,
 }
 
 data class ConversationState(
