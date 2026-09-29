@@ -151,7 +151,7 @@ class BotController(
     }
 
     private fun mainMenuDescription(profile: UserProfile): String {
-        val indent = "  "
+        val indent = "       "
         val tariffs = repository.findActiveTariffs(profile.telegramUserId)
         val latest = readings.latestCalculation(profile.telegramUserId)?.current
         val official = tariffUpdates.latest()
@@ -177,11 +177,11 @@ class BotController(
         }
         return "<b>Главное меню</b>\n\n" +
             "🏡 <b>Участок:</b> <code>${escapeHtml(profile.plotNumber)}</code>\n" +
-            "⚙️ <b>Тарифы:</b>\n$tariffText\n" +
-            "💡 <b>Официальные тарифы:</b>\n$officialText\n" +
-            "📊 <b>Последнее показание:</b>\n$latestText\n" +
-            "🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
-            "👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>"
+            "\n⚙️ <b>Тарифы:</b>\n$tariffText\n" +
+            "\n💡 <b>Официальные тарифы:</b>\n$officialText\n" +
+            "\n📊 <b>Последнее показание:</b>\n$latestText\n" +
+            "\n🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
+            "\n👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>"
     }
 
     private fun startReading(userId: Long, chatId: Long) {
