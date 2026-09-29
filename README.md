@@ -96,41 +96,16 @@ TARIFF_SERVICE_TOKEN=<тот же общий секрет>          # секре
 
 ### Отправка новой версии
 
-Один раз добавьте remotes, подставив SSH-адреса репозиториев Amvera из панели:
+После коммита отправьте основное приложение:
 
 ```powershell
-git remote add amvera-bot <SSH-адрес-репозитория-основного-приложения>
-git remote add amvera-tariffs <SSH-адрес-репозитория-сервиса-тарифов>
+git push amvera HEAD:master
 ```
 
-Обычная версия основного приложения:
+Для сервиса тарифов выполните одну строку. Она обновит ветку сервиса кодом из `master`, отправит её и вернёт вас обратно в `master`:
 
 ```powershell
-.\gradlew.bat test
-git add <файлы>
-git commit -m "feat: описание изменения"
-git push origin master
-git push amvera-bot master
-```
-
-Для сервиса тарифов нужен отдельный deploy-branch, потому что Amvera читает `amvera.yml` из корня репозитория. Создайте его один раз:
-
-```powershell
-git switch -c tariff-deploy
-Copy-Item tariff-provider/amvera.yml amvera.yml
-git add amvera.yml
-git commit -m "ci: configure tariff service deployment"
-git push amvera-tariffs tariff-deploy:master
-git switch master
-```
-
-После следующих изменений обновляйте сервис так:
-
-```powershell
-git switch tariff-deploy
-git merge master
-git push amvera-tariffs tariff-deploy:master
-git switch master
+git switch tariff-provider-deploy; git merge master; git push mosenergo HEAD:master; git switch master
 ```
 
 После каждого push Amvera пересобирает и перезапускает соответствующее приложение. Проверяйте статус «Запущено» и журнал приложения в панели.
