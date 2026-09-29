@@ -10,5 +10,4 @@ data/
 *.iml
 .env
 ~$*.xlsx
-tariff-provider/
 
