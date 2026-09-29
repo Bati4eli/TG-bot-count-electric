@@ -11,6 +11,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.YearMonth
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -159,6 +160,44 @@ class JdbcRepositoryTest {
 
             repository.clearTariffAlerts()
             assertEquals(false, repository.wasTariffAlertSent(1, official))
+        } finally {
+            Files.deleteIfExists(database)
+        }
+    }
+
+    @Test
+    fun `finds stale reading users once and clears reminder after a new reading`() {
+        val database = Files.createTempFile("electricity-reading-reminder-test", ".db")
+        try {
+            val repository = JdbcRepository(database, clock)
+            repository.migrate()
+            repository.saveProfile(UserProfile(1, 101, "1"))
+            repository.saveProfile(UserProfile(2, 202, "2"))
+            repository.saveProfile(UserProfile(3, 303, "3"))
+            repository.saveActiveTariffs(1, Tariffs(733, 332))
+            repository.saveActiveTariffs(2, Tariffs(733, 332))
+            repository.saveActiveTariffs(3, Tariffs(733, 332))
+            ReadingService(repository, ElectricityCalculator(), clockAt("2026-08-20")).addReading(1, 10_000, 20_000)
+            ReadingService(repository, ElectricityCalculator(), clock).addReading(3, 30_000, 40_000)
+
+            val cutoff = LocalDate.parse("2026-09-03")
+            assertEquals(
+                setOf(1L, 2L),
+                repository.findUsersNeedingReadingReminder(cutoff, YearMonth.of(2026, 9)).map { it.profile.telegramUserId }.toSet(),
+            )
+
+            repository.markReadingReminderSent(1, YearMonth.of(2026, 9))
+            assertEquals(
+                setOf(2L),
+                repository.findUsersNeedingReadingReminder(cutoff, YearMonth.of(2026, 9)).map { it.profile.telegramUserId }.toSet(),
+            )
+
+            ReadingService(repository, ElectricityCalculator(), clock).addReading(1, 10_100, 20_100)
+            assertEquals(
+                setOf(1L, 2L, 3L),
+                repository.findUsersNeedingReadingReminder(LocalDate.parse("2026-10-01"), YearMonth.of(2026, 10))
+                    .map { it.profile.telegramUserId }.toSet(),
+            )
         } finally {
             Files.deleteIfExists(database)
         }

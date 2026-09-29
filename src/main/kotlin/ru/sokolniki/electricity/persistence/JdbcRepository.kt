@@ -13,6 +13,7 @@ import java.sql.ResultSet
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.util.Properties
 
 /** Сохраняет изолированные данные пользователей Telegram и состояние бота в локальной базе SQLite. */
@@ -78,6 +79,16 @@ class JdbcRepository(
                         telegram_user_id INTEGER PRIMARY KEY,
                         tariff_t1_cents INTEGER NOT NULL,
                         tariff_t2_cents INTEGER NOT NULL,
+                        sent_at INTEGER NOT NULL,
+                        FOREIGN KEY (telegram_user_id) REFERENCES user_profiles(telegram_user_id)
+                    )
+                    """.trimIndent(),
+                )
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS reading_reminders (
+                        telegram_user_id INTEGER PRIMARY KEY,
+                        reminder_month TEXT NOT NULL,
                         sent_at INTEGER NOT NULL,
                         FOREIGN KEY (telegram_user_id) REFERENCES user_profiles(telegram_user_id)
                     )
@@ -268,6 +279,61 @@ class JdbcRepository(
         }
     }
 
+    /** Возвращает пользователей без показаний позднее заданной даты, ещё не получавших напоминание в этом месяце. */
+    fun findUsersNeedingReadingReminder(
+        lastAllowedReadingDate: LocalDate,
+        reminderMonth: YearMonth,
+    ): List<ReadingReminderTarget> = connect().use { connection ->
+        connection.prepareStatement(
+            """
+            SELECT p.telegram_user_id, p.chat_id, p.plot_number, MAX(r.reading_date) AS latest_reading_date
+            FROM user_profiles p
+            LEFT JOIN readings r ON r.telegram_user_id = p.telegram_user_id
+            LEFT JOIN reading_reminders reminder ON reminder.telegram_user_id = p.telegram_user_id
+            WHERE reminder.telegram_user_id IS NULL OR reminder.reminder_month <> ?
+            GROUP BY p.telegram_user_id, p.chat_id, p.plot_number
+            HAVING MAX(r.reading_date) IS NULL OR MAX(r.reading_date) < ?
+            """.trimIndent(),
+        ).use { statement ->
+            statement.setString(1, reminderMonth.toString())
+            statement.setString(2, lastAllowedReadingDate.toString())
+            statement.executeQuery().use { resultSet ->
+                buildList {
+                    while (resultSet.next()) {
+                        add(
+                            ReadingReminderTarget(
+                                profile = UserProfile(
+                                    telegramUserId = resultSet.getLong("telegram_user_id"),
+                                    chatId = resultSet.getLong("chat_id"),
+                                    plotNumber = resultSet.getString("plot_number"),
+                                ),
+                                latestReadingDate = resultSet.getString("latest_reading_date")?.let(LocalDate::parse),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Фиксирует успешную доставку напоминания, чтобы не отправлять его повторно в этом месяце. */
+    fun markReadingReminderSent(userId: Long, reminderMonth: YearMonth) {
+        connect().use { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO reading_reminders(telegram_user_id, reminder_month, sent_at) VALUES (?, ?, ?)
+                ON CONFLICT(telegram_user_id) DO UPDATE SET sent_at = excluded.sent_at
+                    , reminder_month = excluded.reminder_month
+                """.trimIndent(),
+            ).use { statement ->
+                statement.setLong(1, userId)
+                statement.setString(2, reminderMonth.toString())
+                statement.setLong(3, now())
+                statement.executeUpdate()
+            }
+        }
+    }
+
     /** Очищает отметки о доставке после изменения официальной пары тарифов. */
     fun clearTariffAlerts() {
         connect().use { connection ->
@@ -341,6 +407,7 @@ class JdbcRepository(
                 resultSet.getLong(1)
             }
         }
+        clearReadingReminder(connection, reading.telegramUserId)
         reading.copy(id = id)
     }
 
@@ -437,6 +504,7 @@ class JdbcRepository(
                 statement.executeBatch()
             }
             saveActiveTariffs(connection, userId, entries.last().tariffs)
+            clearReadingReminder(connection, userId)
             HistoryReplacementResult(removedCount = removedCount, importedCount = entries.size)
         }
     }
@@ -546,6 +614,13 @@ class JdbcRepository(
         }
     }
 
+    private fun clearReadingReminder(connection: Connection, userId: Long) {
+        connection.prepareStatement("DELETE FROM reading_reminders WHERE telegram_user_id = ?").use { statement ->
+            statement.setLong(1, userId)
+            statement.executeUpdate()
+        }
+    }
+
     private fun readStateValue(connection: Connection, key: String): Long? = connection.prepareStatement(
         "SELECT state_value FROM bot_state WHERE state_key = ?",
     ).use { statement ->
@@ -617,5 +692,11 @@ data class HistoryReplacementResult(
 data class UserTariffTarget(
     val profile: UserProfile,
     val tariffs: Tariffs?,
+)
+
+/** Связывает пользователя с датой его последнего показания для ежемесячного напоминания. */
+data class ReadingReminderTarget(
+    val profile: UserProfile,
+    val latestReadingDate: LocalDate?,
 )
 

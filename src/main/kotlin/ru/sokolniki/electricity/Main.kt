@@ -7,6 +7,8 @@ import ru.sokolniki.electricity.domain.ElectricityCalculator
 import ru.sokolniki.electricity.domain.MessageFormatter
 import ru.sokolniki.electricity.history.ExcelHistoryService
 import ru.sokolniki.electricity.persistence.JdbcRepository
+import ru.sokolniki.electricity.reminders.MonthlyReadingReminderScheduler
+import ru.sokolniki.electricity.reminders.ReadingReminderJob
 import ru.sokolniki.electricity.telegram.BotController
 import ru.sokolniki.electricity.telegram.BotRunner
 import ru.sokolniki.electricity.telegram.TelegramClient
@@ -50,6 +52,10 @@ fun main() {
             clock = clock,
         ).start()
     } ?: println("[bot] Сервис официальных тарифов не настроен; используются сохранённые данные.")
+    MonthlyReadingReminderScheduler(
+        job = ReadingReminderJob(repository, telegram, clock),
+        clock = clock,
+    ).start()
     Runtime.getRuntime().addShutdownHook(Thread {
         println("[bot] Получен сигнал завершения. Основное приложение остановлено.")
     })
