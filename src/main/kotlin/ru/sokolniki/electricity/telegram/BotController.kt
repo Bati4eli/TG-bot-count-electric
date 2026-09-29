@@ -143,20 +143,17 @@ class BotController(
         val officialText = if (official == null) {
             "<i>ещё не получены</i>"
         } else {
-            "<code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
+            "  <code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
                 "Т2 ${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n" +
-                "<i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
+                "  <i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
         }
-        return """
-            <b>Главное меню</b>
-
-            🏡 <b>Участок:</b> ${escapeHtml(profile.plotNumber)}
-            ⚙️ <b>Тарифы:</b> $tariffText
-            💡 <b>Официальные тарифы:</b> $officialText
-            📊 <b>Последнее показание:</b> $latestText
-            🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>
-            👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>
-        """.trimIndent()
+        return "<b>Главное меню</b>\n\n" +
+            "🏡 <b>Участок:</b> ${escapeHtml(profile.plotNumber)}\n" +
+            "⚙️ <b>Тарифы:</b> $tariffText\n" +
+            "💡 <b>Официальные тарифы:</b>\n$officialText\n" +
+            "📊 <b>Последнее показание:</b> $latestText\n" +
+            "🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
+            "👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>"
     }
 
     private fun startReading(userId: Long, chatId: Long) {

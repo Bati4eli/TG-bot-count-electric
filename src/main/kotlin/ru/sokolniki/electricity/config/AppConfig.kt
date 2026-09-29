@@ -26,10 +26,14 @@ object AppConfigLoader {
         require(serviceUrl.isEmpty() == serviceToken.isEmpty()) {
             "Для сервиса тарифов необходимо задать одновременно TARIFF_SERVICE_URL и TARIFF_SERVICE_TOKEN."
         }
+        val serviceUri = serviceUrl.takeIf { it.isNotEmpty() }?.let(URI::create)
+        require(serviceUri == null || serviceUri.scheme in setOf("http", "https")) {
+            "TARIFF_SERVICE_URL должен начинаться с http:// или https://."
+        }
         return AppConfig(
             botToken = token,
             databasePath = databasePath,
-            tariffServiceUri = serviceUrl.takeIf { it.isNotEmpty() }?.let(URI::create),
+            tariffServiceUri = serviceUri,
             tariffServiceToken = serviceToken.takeIf { it.isNotEmpty() },
         )
     }

@@ -17,7 +17,7 @@ class TariffUpdateService(
     fun refresh(): List<TariffAlert> {
         val official = requireNotNull(provider) {
             "Не настроен адрес отдельного сервиса тарифов."
-        }.fetch()
+        }.fetchFresh()
         val previous = repository.findOfficialTariffs()
         val officialChanged = previous?.tariffs != official.tariffs
         if (officialChanged) {

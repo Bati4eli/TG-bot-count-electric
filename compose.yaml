@@ -5,8 +5,19 @@ services:
     environment:
       BOT_TOKEN: ${BOT_TOKEN:?Set BOT_TOKEN in .env}
       ELECTRICITY_DB: /app/data/electricity.db
+      TARIFF_SERVICE_URL: http://tariff-provider:8080/v1/tariffs
+      TARIFF_SERVICE_TOKEN: ${TARIFF_SERVICE_TOKEN:?Set TARIFF_SERVICE_TOKEN in .env}
     volumes:
       - electricity_data:/app/data
+
+  tariff-provider:
+    build:
+      context: .
+      dockerfile: tariff-provider/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      TARIFF_SERVICE_TOKEN: ${TARIFF_SERVICE_TOKEN:?Set TARIFF_SERVICE_TOKEN in .env}
 
 volumes:
   electricity_data:

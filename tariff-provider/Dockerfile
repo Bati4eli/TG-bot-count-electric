@@ -16,13 +16,10 @@ WORKDIR /app
 
 COPY --from=build --chown=provider:provider /workspace/tariff-provider/build/install/tariff-provider ./
 RUN printf '195.82.140.164 www.mosenergosbyt.ru\n' > /app/java-hosts
-RUN mkdir -p /data && chown provider:provider /data
 
 USER provider
 ENV PORT=8080
-ENV TARIFF_SERVICE_STATE=/data/tariff-service.properties
 ENV JAVA_TOOL_OPTIONS=-Djdk.net.hosts.file=/app/java-hosts
 
-VOLUME ["/data"]
 EXPOSE 8080
 ENTRYPOINT ["bin/tariff-provider"]

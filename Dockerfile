@@ -6,6 +6,8 @@ COPY gradle gradle
 COPY gradlew build.gradle.kts settings.gradle.kts шаблон.xlsx ./
 RUN chmod +x gradlew
 
+COPY shared shared
+COPY tariff-provider tariff-provider
 COPY src src
 # Kotlin daemon оставляет временный файл, который Kaniko в Amvera иногда успевает
 # увидеть уже удалённым при создании слоя. Компилируем в процессе Gradle.

@@ -1,6 +1,5 @@
 package ru.sokolniki.electricity.tariffs
 
-import com.sun.org.slf4j.internal.LoggerFactory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -24,34 +23,37 @@ class RemoteTariffServiceClient(
         require(token.isNotBlank()) { "Не задан секрет для сервиса тарифов." }
     }
 
-    /** Загружает последнюю успешную пару тарифов, не обращаясь к Мосэнергосбыту напрямую. */
-    fun fetch(): OfficialTariffs {
-        try {
-            val response = http.send(
-                HttpRequest.newBuilder(serviceUri)
-                    .timeout(REQUEST_TIMEOUT)
-                    .header("Authorization", "Bearer $token")
-                    .GET()
-                    .build(),
-                HttpResponse.BodyHandlers.ofString(),
-            )
-            check(response.statusCode() == 200) {
-                "Сервис тарифов вернул HTTP ${response.statusCode()}."
-            }
-            val body = json.parseToJsonElement(response.body()).jsonObject
-            return OfficialTariffs(
-                tariffs = Tariffs(
-                    t1Cents = body.requiredLong("t1Cents"),
-                    t2Cents = body.requiredLong("t2Cents"),
-                ),
-                sourceUrl = body.requiredString("sourceUrl"),
-                retrievedAt = Instant.parse(body.requiredString("retrievedAt")),
-            )
-        } catch (e: Exception) {
-            System.err.println("Ошибочка вышла при получении тарифов: " + e.message)
-            throw e
+    /**
+     * Запрашивает у сервиса свежую официальную пару тарифов.
+     *
+     * Параметр `refresh=true` заставляет сервис обновить свой кэш именно по инициативе бота.
+     */
+    fun fetchFresh(): OfficialTariffs {
+        val response = http.send(
+            HttpRequest.newBuilder(refreshUri())
+                .timeout(REQUEST_TIMEOUT)
+                .header("Authorization", "Bearer $token")
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+        check(response.statusCode() == 200) {
+            "Сервис тарифов вернул HTTP ${response.statusCode()}."
         }
+        val body = json.parseToJsonElement(response.body()).jsonObject
+        return OfficialTariffs(
+            tariffs = Tariffs(
+                t1Cents = body.requiredLong("t1Cents"),
+                t2Cents = body.requiredLong("t2Cents"),
+            ),
+            sourceUrl = body.requiredString("sourceUrl"),
+            retrievedAt = Instant.parse(body.requiredString("retrievedAt")),
+        )
+    }
 
+    private fun refreshUri(): URI {
+        val query = listOfNotNull(serviceUri.rawQuery, "refresh=true").joinToString("&")
+        return URI(serviceUri.scheme, serviceUri.authority, serviceUri.path, query, serviceUri.fragment)
     }
 
     private fun Map<String, kotlinx.serialization.json.JsonElement>.requiredLong(name: String): Long =
