@@ -13,13 +13,13 @@ object ButtonText {
     const val ADD_READING = "➕ Внести показания"
     const val TARIFFS = "⚙️ Изменить тарифы"
     const val OFFICIAL_TARIFFS = "💡 Актуальные тарифы"
-    const val EDIT_LAST = "✏️ Изменить последнее"
+    const val EDIT_LAST = "✏️ Изменить показание"
     const val LAST_READING = "📊 Последнее показание"
-    const val DOWNLOAD_HISTORY = "📥 Скачать историю Excel"
-    const val UPLOAD_HISTORY = "📤 Загрузить данные"
-    const val BANK = "📋 Банк"
-    const val CHAIRMAN = "📋 Председатель"
-    const val PLOT = "🏡 Участок"
+    const val DOWNLOAD_HISTORY = "📥 Скачать историю"
+    const val UPLOAD_HISTORY = "📤 Загрузить историю"
+    const val BANK = "📋 Текст для банка"
+    const val CHAIRMAN = "📋 Текст для чата"
+    const val PLOT = "🏡 Изменить участок"
     const val MENU = "◀️ Меню"
 }
 
@@ -27,11 +27,9 @@ object ButtonText {
 object KeyboardFactory {
     fun main(): JsonObject = replyKeyboard(
         listOf(
-            listOf(ButtonText.ADD_READING, ButtonText.TARIFFS),
-            listOf(ButtonText.OFFICIAL_TARIFFS),
-            listOf(ButtonText.EDIT_LAST, ButtonText.LAST_READING),
-            listOf(ButtonText.DOWNLOAD_HISTORY),
-            listOf(ButtonText.UPLOAD_HISTORY),
+            listOf(ButtonText.ADD_READING, ButtonText.EDIT_LAST),
+            listOf(ButtonText.TARIFFS, ButtonText.OFFICIAL_TARIFFS),
+            listOf(ButtonText.DOWNLOAD_HISTORY, ButtonText.UPLOAD_HISTORY),
             listOf(ButtonText.BANK, ButtonText.CHAIRMAN),
             listOf(ButtonText.PLOT, ButtonText.MENU),
         ),

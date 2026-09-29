@@ -17,13 +17,20 @@ class KeyboardFactoryTest {
     }
 
     @Test
-    fun `main keyboard contains history export and import actions`() {
+    fun `main keyboard uses requested two button rows and order`() {
         val rows = KeyboardFactory.main()["keyboard"]!!.jsonArray
             .map { row -> row.jsonArray.map { it.jsonPrimitive.content } }
 
-        assertEquals(true, rows.flatten().contains(ButtonText.DOWNLOAD_HISTORY))
-        assertEquals(true, rows.flatten().contains(ButtonText.UPLOAD_HISTORY))
-        assertEquals(true, rows.flatten().contains(ButtonText.OFFICIAL_TARIFFS))
+        assertEquals(
+            listOf(
+                listOf(ButtonText.ADD_READING, ButtonText.EDIT_LAST),
+                listOf(ButtonText.TARIFFS, ButtonText.OFFICIAL_TARIFFS),
+                listOf(ButtonText.DOWNLOAD_HISTORY, ButtonText.UPLOAD_HISTORY),
+                listOf(ButtonText.BANK, ButtonText.CHAIRMAN),
+                listOf(ButtonText.PLOT, ButtonText.MENU),
+            ),
+            rows,
+        )
     }
 
     @Test
