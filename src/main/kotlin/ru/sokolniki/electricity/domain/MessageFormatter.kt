@@ -31,14 +31,22 @@ class MessageFormatter {
 
     fun readingSummary(calculation: ReadingCalculation): String = with(calculation) {
         """
-        Последнее показание от ${current.date.format(dateFormatter)}
-        Т1: ${kwh(current.t1Kwh)} кВт·ч
-        Т2: ${kwh(current.t2Kwh)} кВт·ч
-        Расход Т1: ${kwh(consumption.t1Kwh)} кВт·ч
-        Расход Т2: ${kwh(consumption.t2Kwh)} кВт·ч
-        Тариф Т1: ${rublesWithCents(current.tariffs.t1Rubles)} ₽
-        Тариф Т2: ${rublesWithCents(current.tariffs.t2Rubles)} ₽
-        К оплате: ${rubles(paymentRubles)} ₽
+        📊 Последнее показание
+        📅 ${current.date.format(dateFormatter)}
+
+        ⚡ Показания счётчика
+        • Т1: ${kwh(current.t1Kwh)} кВт·ч
+        • Т2: ${kwh(current.t2Kwh)} кВт·ч
+
+        📈 Расход за период
+        • Т1: ${kwh(consumption.t1Kwh)} кВт·ч
+        • Т2: ${kwh(consumption.t2Kwh)} кВт·ч
+
+        💰 Тарифы
+        • Т1: ${rublesWithCents(current.tariffs.t1Rubles)} ₽
+        • Т2: ${rublesWithCents(current.tariffs.t2Rubles)} ₽
+
+        ✅ К оплате: ${rubles(paymentRubles)} ₽
         """.trimIndent()
     }
 

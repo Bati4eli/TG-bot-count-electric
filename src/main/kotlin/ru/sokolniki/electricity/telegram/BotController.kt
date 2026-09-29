@@ -108,8 +108,20 @@ class BotController(
                 repository.clearState(callback.userId)
                 sendWithMenu(chatId, "Редактирование отменено.")
             }
-            "edit:reading_t1" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T1, "Введите новое показание Т1:")
-            "edit:reading_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T2, "Введите новое показание Т2:")
+            "edit:reading_t1" -> beginFieldEdit(
+                callback.userId,
+                chatId,
+                ConversationStep.EDIT_READING_T1,
+                readingInputPrompt(callback.userId, "Т1", "Введите новое показание Т1"),
+                parseMode = "HTML",
+            )
+            "edit:reading_t2" -> beginFieldEdit(
+                callback.userId,
+                chatId,
+                ConversationStep.EDIT_READING_T2,
+                readingInputPrompt(callback.userId, "Т2", "Введите новое показание Т2"),
+                parseMode = "HTML",
+            )
             "edit:tariff_t1" -> beginFieldEdit(
                 callback.userId,
                 chatId,
@@ -143,29 +155,32 @@ class BotController(
         val latest = readings.latestCalculation(profile.telegramUserId)?.current
         val official = tariffUpdates.latest()
         val tariffText = if (tariffs == null) {
-            "<i>не настроены</i>"
+            "\t<i>не настроены</i>"
         } else {
-            "<code>Т1 ${formatDecimal(tariffs.t1Rubles)} ₽ · Т2 ${formatDecimal(tariffs.t2Rubles)} ₽</code>"
+            "\t<code>Т1 ${formatDecimal(tariffs.t1Rubles)} ₽ · Т2 ${formatDecimal(tariffs.t2Rubles)} ₽</code>"
         }
         val latestText = if (latest == null) {
-            "<i>ещё нет</i>"
+            "\t<i>ещё нет</i>"
         } else {
-            "<code>${latest.date}: Т1 ${formatDecimal(latest.t1Kwh)}, Т2 ${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
+            val staleMark = if (latest.date.isBefore(java.time.LocalDate.now(ZoneId.of("Europe/Moscow")).minusDays(25))) " ❗" else ""
+            "\t<code>${latest.date}$staleMark</code>\n" +
+                "\tТ1: <code>${formatDecimal(latest.t1Kwh)} кВт·ч</code>\n" +
+                "\tТ2: <code>${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
         }
         val officialText = if (official == null) {
-            "<i>ещё не получены</i>"
+            "\t<i>ещё не получены</i>"
         } else {
-            "  <code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
+            "\t<code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
                 "Т2 ${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n" +
-                "  <i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
+                "\t<i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
         }
         return "<b>Главное меню</b>\n\n" +
-            "🏡 <b>Участок:</b> ${escapeHtml(profile.plotNumber)}\n" +
-            "⚙️ <b>Тарифы:</b> $tariffText\n" +
+            "🏡 <b>Участок:</b>\n\t<code>${escapeHtml(profile.plotNumber)}</code>\n" +
+            "⚙️ <b>Тарифы:</b>\n$tariffText\n" +
             "💡 <b>Официальные тарифы:</b>\n$officialText\n" +
-            "📊 <b>Последнее показание:</b> $latestText\n" +
-            "🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
-            "👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>"
+            "📊 <b>Последнее показание:</b>\n$latestText\n" +
+            "🗂 <b>Сохранено показаний:</b>\n\t<code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
+            "👥 <b>Пользователей бота:</b>\n\t<code>${repository.countUsers()}</code>"
     }
 
     private fun startReading(userId: Long, chatId: Long) {
@@ -176,7 +191,7 @@ class BotController(
             return
         }
         repository.saveState(userId, ConversationState(ConversationStep.READING_T1))
-        telegram.sendMessage(chatId, "Введите текущее показание Т1 в кВт·ч:", KeyboardFactory.setup())
+        sendReadingInput(chatId, readingInputPrompt(userId, "Т1", "Введите текущее показание Т1 в кВт·ч"))
     }
 
     private fun startTariffChange(userId: Long, chatId: Long) {
@@ -355,7 +370,12 @@ class BotController(
             return
         }
         val text = messages.bankMessage(profile, calculation)
-        telegram.sendMessage(chatId, text, KeyboardFactory.copyText(text))
+        telegram.sendMessage(
+            chatId,
+            "$text\n\nОплатить: <code>${calculation.paymentRubles} р</code>",
+            KeyboardFactory.copyText(text),
+            parseMode = "HTML",
+        )
     }
 
     private fun sendChairmanMessage(userId: Long, chatId: Long) {
@@ -433,7 +453,7 @@ class BotController(
     private fun saveReadingT1(message: IncomingMessage) {
         val t1 = InputParser.readingHundredths(message.text.orEmpty())
         repository.saveState(message.userId, ConversationState(ConversationStep.READING_T2, t1))
-        telegram.sendMessage(message.chatId, "Введите текущее показание Т2 в кВт·ч:", KeyboardFactory.setup())
+        sendReadingInput(message.chatId, readingInputPrompt(message.userId, "Т2", "Введите текущее показание Т2 в кВт·ч"))
     }
 
     private fun saveReadingT2(message: IncomingMessage, state: ConversationState) {
@@ -473,6 +493,10 @@ class BotController(
     private fun sendTariffInput(chatId: Long, text: String) =
         telegram.sendMessage(chatId, text, KeyboardFactory.setup(), parseMode = "HTML")
 
+    /** Отправляет подсказку для показаний с цитатой последнего сохранённого значения. */
+    private fun sendReadingInput(chatId: Long, text: String) =
+        telegram.sendMessage(chatId, text, KeyboardFactory.setup(), parseMode = "HTML")
+
     /** Формирует подсказку для ввода тарифа с сохранённым и официальным значениями зоны. */
     private fun tariffInputPrompt(userId: Long, zone: String, title: String = "Введите тариф $zone в рублях за кВт·ч"): String {
         val userTariff = repository.findActiveTariffs(userId)?.valueFor(zone)
@@ -480,6 +504,16 @@ class BotController(
         return "<blockquote>Текущее значение $zone: ${userTariff?.let(::formatTariff) ?: "не задан"}</blockquote>\n" +
             "<blockquote>Тариф Мосэнергосбыта $zone: ${officialTariff?.let(::formatTariff) ?: "ещё не получен"}</blockquote>\n\n" +
             "${title.trimEnd('.', ':')}:"
+    }
+
+    /** Формирует подсказку для показаний, сохраняя в цитате последнее значение счётчика. */
+    private fun readingInputPrompt(userId: Long, zone: String, title: String): String {
+        val latest = readings.latestCalculation(userId)?.current
+        val quote = latest?.let {
+            "<blockquote>Последнее показание от ${it.date}: " +
+                "Т1 ${formatDecimal(it.t1Kwh)} · Т2 ${formatDecimal(it.t2Kwh)} кВт·ч</blockquote>\n\n"
+        }.orEmpty()
+        return quote + "${title.trimEnd('.', ':')}:"
     }
 
     private fun Tariffs.valueFor(zone: String): Long = when (zone) {
