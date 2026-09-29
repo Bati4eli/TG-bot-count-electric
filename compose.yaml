@@ -12,8 +12,8 @@ services:
 
   tariff-provider:
     build:
-      context: .
-      dockerfile: tariff-provider/Dockerfile
+      context: ./tariff-provider
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       PORT: 8080

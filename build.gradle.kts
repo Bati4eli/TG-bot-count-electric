@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "ru.sokolniki"
-version = "1.0.3"
+version = "1.0.4"
 
 repositories {
     mavenCentral()
@@ -24,9 +24,9 @@ dependencies {
 }
 
 tasks.register("buildAllJars") {
-    description = "Собирает исполняемые JAR-файлы Telegram-бота и сервиса тарифов."
+    description = "Собирает исполняемый JAR-файл Telegram-бота."
     group = "build"
-    dependsOn(tasks.jar, ":tariff-provider:jar")
+    dependsOn(tasks.jar)
 }
 
 kotlin {
