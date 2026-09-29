@@ -8,11 +8,16 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 
 /** Хранит параметры отдельного сервиса официальных тарифов. */
-data class TariffServiceConfig(val token: String, val port: Int)
+data class TariffServiceConfig(
+    val token: String,
+    val port: Int,
+    val cachePath: Path? = null,
+)
 
 /** Загружает параметры сервиса тарифов из переменных окружения. */
 object TariffServiceConfigLoader {
@@ -21,7 +26,10 @@ object TariffServiceConfigLoader {
         require(token.isNotEmpty()) { "Не задана переменная окружения TARIFF_SERVICE_TOKEN." }
         val port = environment["PORT"]?.toIntOrNull() ?: 8080
         require(port in 1..65535) { "PORT должен быть числом от 1 до 65535." }
-        return TariffServiceConfig(token, port)
+        val cachePath = environment["TARIFF_CACHE_PATH"]?.trim()?.takeIf(String::isNotEmpty)
+            ?.let(Path::of)
+            ?: Path.of("data", "tariff-cache.properties")
+        return TariffServiceConfig(token, port, cachePath)
     }
 }
 
@@ -37,9 +45,18 @@ class TariffServiceServer(
     private val cacheLock = Any()
     private var cachedDate: LocalDate? = null
     private var cachedTariffs: OfficialTariffs? = null
+    private val persistentCache = config.cachePath?.let(::TariffCacheFile)
     private val server = HttpServer.create(InetSocketAddress(config.port), 0).apply {
         executor = Executors.newFixedThreadPool(2) { Thread(it, "tariff-service-http").apply { isDaemon = true } }
         createContext("/v1/tariffs") { handleTariffs(it) }
+    }
+
+    init {
+        persistentCache?.load()?.let { saved ->
+            cachedDate = saved.date
+            cachedTariffs = saved.toOfficialTariffs()
+            println("[tariff-provider] Загружен кэш тарифов за ${saved.date}: ${config.cachePath}.")
+        }
     }
 
     /** Фактический порт HTTP-сервера, в том числе выбранный автоматически для тестов. */
@@ -77,11 +94,15 @@ class TariffServiceServer(
                 val tariffs = fetchTariffs()
                 cachedDate = date
                 cachedTariffs = tariffs
+                runCatching { persistentCache?.save(date, tariffs) }
+                    .onFailure { error ->
+                        System.err.println("[tariff-provider] Не удалось сохранить кэш в ${config.cachePath}: ${error.message}")
+                    }
                 println(
                     "[tariff-provider] Тарифы за $date получены: " +
                         "Т1 ${formatTariff(tariffs.tariffs.t1Cents)} ₽, " +
                         "Т2 ${formatTariff(tariffs.tariffs.t2Cents)} ₽; " +
-                        "кэш в памяти обновлён.",
+                        "кэш обновлён${config.cachePath?.let { " в $it" }.orEmpty()}.",
                 )
                 return tariffs
             } catch (error: Exception) {

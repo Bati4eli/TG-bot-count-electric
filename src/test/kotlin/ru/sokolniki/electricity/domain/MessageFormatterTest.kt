@@ -32,8 +32,6 @@ class MessageFormatterTest {
             ТО: 1012
             Т1: 411
             T2: 602
-
-            Оплачено: 5006,00 руб.
             """.trimIndent(),
             formatter.chairmanMessage(profile, calculation()),
         )

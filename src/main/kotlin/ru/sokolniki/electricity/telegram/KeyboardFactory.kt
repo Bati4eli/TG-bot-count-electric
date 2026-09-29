@@ -11,7 +11,7 @@ import java.math.BigDecimal
 /** Хранит текстовые подписи, используемые в клавиатурах и обработке команд. */
 object ButtonText {
     const val ADD_READING = "➕ Внести показания"
-    const val TARIFFS = "⚙️ Тарифы"
+    const val TARIFFS = "⚙️ Изменить тарифы"
     const val OFFICIAL_TARIFFS = "💡 Актуальные тарифы"
     const val EDIT_LAST = "✏️ Изменить последнее"
     const val LAST_READING = "📊 Последнее показание"

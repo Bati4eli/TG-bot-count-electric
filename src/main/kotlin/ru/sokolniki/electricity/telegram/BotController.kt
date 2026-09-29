@@ -108,19 +108,21 @@ class BotController(
                 repository.clearState(callback.userId)
                 sendWithMenu(chatId, "Редактирование отменено.")
             }
-            "edit:reading_t1" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T1, "Введите новое показание Т1.")
-            "edit:reading_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T2, "Введите новое показание Т2.")
+            "edit:reading_t1" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T1, "Введите новое показание Т1:")
+            "edit:reading_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T2, "Введите новое показание Т2:")
             "edit:tariff_t1" -> beginFieldEdit(
                 callback.userId,
                 chatId,
                 ConversationStep.EDIT_TARIFF_T1,
-                tariffInputPrompt(callback.userId, "Т1", "Введите новый тариф Т1 в рублях за кВт·ч."),
+                tariffInputPrompt(callback.userId, "Т1", "Введите новый тариф Т1 в рублях за кВт·ч"),
+                parseMode = "HTML",
             )
             "edit:tariff_t2" -> beginFieldEdit(
                 callback.userId,
                 chatId,
                 ConversationStep.EDIT_TARIFF_T2,
-                tariffInputPrompt(callback.userId, "Т2", "Введите новый тариф Т2 в рублях за кВт·ч."),
+                tariffInputPrompt(callback.userId, "Т2", "Введите новый тариф Т2 в рублях за кВт·ч"),
+                parseMode = "HTML",
             )
             "tariffs:apply_recommended" -> applyRecommendedTariffs(callback.userId, chatId)
         }
@@ -170,21 +172,17 @@ class BotController(
         if (!isConfigured(userId, chatId)) return
         if (repository.findActiveTariffs(userId) == null) {
             repository.saveState(userId, ConversationState(ConversationStep.TARIFF_T1))
-            telegram.sendMessage(
-                chatId,
-                tariffInputPrompt(userId, "Т1", "Сначала укажите тариф Т1 в рублях за кВт·ч."),
-                KeyboardFactory.setup(),
-            )
+            sendTariffInput(chatId, tariffInputPrompt(userId, "Т1", "Сначала укажите тариф Т1 в рублях за кВт·ч"))
             return
         }
         repository.saveState(userId, ConversationState(ConversationStep.READING_T1))
-        telegram.sendMessage(chatId, "Введите текущее показание Т1 в кВт·ч.", KeyboardFactory.setup())
+        telegram.sendMessage(chatId, "Введите текущее показание Т1 в кВт·ч:", KeyboardFactory.setup())
     }
 
     private fun startTariffChange(userId: Long, chatId: Long) {
         if (!isConfigured(userId, chatId)) return
         repository.saveState(userId, ConversationState(ConversationStep.TARIFF_T1))
-        telegram.sendMessage(chatId, tariffInputPrompt(userId, "Т1"), KeyboardFactory.setup())
+        sendTariffInput(chatId, tariffInputPrompt(userId, "Т1"))
     }
 
     private fun showOfficialTariffs(userId: Long, chatId: Long) {
@@ -199,16 +197,16 @@ class BotController(
         val userTariffsText = userTariffs?.let {
             "Т1: <code>${formatDecimal(it.t1Rubles)} ₽</code>\n" +
                 "Т2: <code>${formatDecimal(it.t2Rubles)} ₽</code>"
-        } ?: "<i>ещё не настроены</i>"
+        }
         val footer = if (tariffsAreCurrent) {
             "✅ <b>У вас всё в порядке: уже установлены актуальные тарифы.</b>"
         } else {
-            "Применение изменит тарифы только для следующих показаний."
+            "Применение изменит тарифы только для следующих показаний." +
+                userTariffsText?.let { "\n\n<b>Ваши тарифы:</b>\n$it" }.orEmpty()
         }
         telegram.sendMessage(
             chatId,
             "💡 <b>Рекомендуемые тарифы</b>\n\n" +
-                "<b>Ваши тарифы:</b>\n$userTariffsText\n\n" +
                 "<b>Тарифы Мосэнергосбыта:</b>\n" +
                 "Т1: <code>${formatDecimal(official.tariffs.t1Rubles)} ₽</code>\n" +
                 "Т2: <code>${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n\n" +
@@ -255,13 +253,19 @@ class BotController(
         )
     }
 
-    private fun beginFieldEdit(userId: Long, chatId: Long, step: ConversationStep, prompt: String) {
+    private fun beginFieldEdit(
+        userId: Long,
+        chatId: Long,
+        step: ConversationStep,
+        prompt: String,
+        parseMode: String? = null,
+    ) {
         if (readings.latestCalculation(userId) == null) {
             sendWithMenu(chatId, "Пока нет показаний для редактирования.")
             return
         }
         repository.saveState(userId, ConversationState(step))
-        telegram.sendMessage(chatId, prompt, KeyboardFactory.setup())
+        telegram.sendMessage(chatId, prompt, KeyboardFactory.setup(), parseMode = parseMode)
     }
 
     private fun showLatestReading(userId: Long, chatId: Long) {
@@ -400,7 +404,7 @@ class BotController(
         repository.saveProfile(profile)
         if (startsSetup) {
             repository.saveState(message.userId, ConversationState(ConversationStep.SETUP_TARIFF_T1))
-            telegram.sendMessage(message.chatId, tariffInputPrompt(message.userId, "Т1"), KeyboardFactory.setup())
+            sendTariffInput(message.chatId, tariffInputPrompt(message.userId, "Т1"))
         } else {
             repository.clearState(message.userId)
             sendWithMenu(message.chatId, "Номер участка сохранён: ${profile.plotNumber}.")
@@ -411,7 +415,7 @@ class BotController(
         val tariffT1 = InputParser.tariffCents(message.text.orEmpty())
         val nextStep = if (setup) ConversationStep.SETUP_TARIFF_T2 else ConversationStep.TARIFF_T2
         repository.saveState(message.userId, ConversationState(nextStep, tariffT1))
-        telegram.sendMessage(message.chatId, tariffInputPrompt(message.userId, "Т2"), KeyboardFactory.setup())
+        sendTariffInput(message.chatId, tariffInputPrompt(message.userId, "Т2"))
     }
 
     private fun saveTariffT2(message: IncomingMessage, state: ConversationState, setup: Boolean) {
@@ -429,7 +433,7 @@ class BotController(
     private fun saveReadingT1(message: IncomingMessage) {
         val t1 = InputParser.readingHundredths(message.text.orEmpty())
         repository.saveState(message.userId, ConversationState(ConversationStep.READING_T2, t1))
-        telegram.sendMessage(message.chatId, "Введите текущее показание Т2 в кВт·ч.", KeyboardFactory.setup())
+        telegram.sendMessage(message.chatId, "Введите текущее показание Т2 в кВт·ч:", KeyboardFactory.setup())
     }
 
     private fun saveReadingT2(message: IncomingMessage, state: ConversationState) {
@@ -465,13 +469,17 @@ class BotController(
 
     private fun sendWithMenu(chatId: Long, text: String) = telegram.sendMessage(chatId, text, KeyboardFactory.main())
 
+    /** Отправляет подсказку для тарифа с HTML-цитатами для справочных значений. */
+    private fun sendTariffInput(chatId: Long, text: String) =
+        telegram.sendMessage(chatId, text, KeyboardFactory.setup(), parseMode = "HTML")
+
     /** Формирует подсказку для ввода тарифа с сохранённым и официальным значениями зоны. */
-    private fun tariffInputPrompt(userId: Long, zone: String, title: String = "Введите тариф $zone в рублях за кВт·ч."): String {
+    private fun tariffInputPrompt(userId: Long, zone: String, title: String = "Введите тариф $zone в рублях за кВт·ч"): String {
         val userTariff = repository.findActiveTariffs(userId)?.valueFor(zone)
         val officialTariff = tariffUpdates.latest()?.tariffs?.valueFor(zone)
-        return "$title\n" +
-            "Текущее значение $zone: ${userTariff?.let(::formatTariff) ?: "не задан"}\n" +
-            "Тариф Мосэнергосбыта $zone: ${officialTariff?.let(::formatTariff) ?: "ещё не получен"}"
+        return "<blockquote>Текущее значение $zone: ${userTariff?.let(::formatTariff) ?: "не задан"}</blockquote>\n" +
+            "<blockquote>Тариф Мосэнергосбыта $zone: ${officialTariff?.let(::formatTariff) ?: "ещё не получен"}</blockquote>\n\n" +
+            "${title.trimEnd('.', ':')}:"
     }
 
     private fun Tariffs.valueFor(zone: String): Long = when (zone) {

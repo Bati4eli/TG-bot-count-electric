@@ -26,8 +26,6 @@ class MessageFormatter {
         ТО: ${whole(consumption.totalKwh)}
         Т1: ${whole(consumption.t1Kwh)}
         T2: ${whole(consumption.t2Kwh)}
-
-        Оплачено: ${rubles(paymentRubles)} руб.
         """.trimIndent()
     }
 

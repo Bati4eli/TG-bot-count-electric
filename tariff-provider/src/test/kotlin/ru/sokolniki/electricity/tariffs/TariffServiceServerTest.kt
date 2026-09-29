@@ -7,6 +7,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Instant
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,6 +35,44 @@ class TariffServiceServerTest {
             assertEquals(2, calls.get())
         } finally {
             service.stop()
+        }
+    }
+
+    @Test
+    fun `после перезапуска кэш за текущую дату загружается из файла`() {
+        val directory = Files.createTempDirectory("tariff-cache-test")
+        val cachePath = directory.resolve("tariffs.properties")
+        val calls = AtomicInteger()
+        try {
+            TariffServiceServer(
+                TariffServiceConfig("shared-secret", 0, cachePath),
+                fetchTariffs = {
+                    calls.incrementAndGet()
+                    OfficialTariffs(Tariffs(773, 332), "https://example.test", Instant.parse("2026-01-01T00:00:00Z"))
+                },
+            ).also { service ->
+                service.start()
+                try {
+                    assertEquals(200, request(service.port, "date=2026-09-29").statusCode())
+                } finally {
+                    service.stop()
+                }
+            }
+
+            TariffServiceServer(
+                TariffServiceConfig("shared-secret", 0, cachePath),
+                fetchTariffs = { error("Запрос к Мосэнергосбыту не должен выполняться при восстановлении кэша.") },
+            ).also { service ->
+                service.start()
+                try {
+                    assertEquals(200, request(service.port, "date=2026-09-29").statusCode())
+                } finally {
+                    service.stop()
+                }
+            }
+            assertEquals(1, calls.get())
+        } finally {
+            directory.toFile().deleteRecursively()
         }
     }
 
