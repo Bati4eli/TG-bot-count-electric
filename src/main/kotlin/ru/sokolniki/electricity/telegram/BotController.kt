@@ -151,36 +151,37 @@ class BotController(
     }
 
     private fun mainMenuDescription(profile: UserProfile): String {
+        val indent = "  "
         val tariffs = repository.findActiveTariffs(profile.telegramUserId)
         val latest = readings.latestCalculation(profile.telegramUserId)?.current
         val official = tariffUpdates.latest()
         val tariffText = if (tariffs == null) {
-            "\t<i>не настроены</i>"
+            "$indent<i>не настроены</i>"
         } else {
-            "\t<code>Т1 ${formatDecimal(tariffs.t1Rubles)} ₽ · Т2 ${formatDecimal(tariffs.t2Rubles)} ₽</code>"
+            "$indent<code>Т1 ${formatDecimal(tariffs.t1Rubles)} ₽ · Т2 ${formatDecimal(tariffs.t2Rubles)} ₽</code>"
         }
         val latestText = if (latest == null) {
-            "\t<i>ещё нет</i>"
+            "$indent<i>ещё нет</i>"
         } else {
             val staleMark = if (latest.date.isBefore(java.time.LocalDate.now(ZoneId.of("Europe/Moscow")).minusDays(25))) " ❗" else ""
-            "\t<code>${latest.date}$staleMark</code>\n" +
-                "\tТ1: <code>${formatDecimal(latest.t1Kwh)} кВт·ч</code>\n" +
-                "\tТ2: <code>${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
+            "$indent<code>${latest.date}$staleMark</code>\n" +
+                "${indent}Т1: <code>${formatDecimal(latest.t1Kwh)} кВт·ч</code>\n" +
+                "${indent}Т2: <code>${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
         }
         val officialText = if (official == null) {
-            "\t<i>ещё не получены</i>"
+            "$indent<i>ещё не получены</i>"
         } else {
-            "\t<code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
+            "$indent<code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
                 "Т2 ${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n" +
-                "\t<i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
+                "$indent<i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
         }
         return "<b>Главное меню</b>\n\n" +
-            "🏡 <b>Участок:</b>\n\t<code>${escapeHtml(profile.plotNumber)}</code>\n" +
+            "🏡 <b>Участок:</b> <code>${escapeHtml(profile.plotNumber)}</code>\n" +
             "⚙️ <b>Тарифы:</b>\n$tariffText\n" +
             "💡 <b>Официальные тарифы:</b>\n$officialText\n" +
             "📊 <b>Последнее показание:</b>\n$latestText\n" +
-            "🗂 <b>Сохранено показаний:</b>\n\t<code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
-            "👥 <b>Пользователей бота:</b>\n\t<code>${repository.countUsers()}</code>"
+            "🗂 <b>Сохранено показаний:</b> <code>${repository.countReadings(profile.telegramUserId)}</code>\n" +
+            "👥 <b>Пользователей бота:</b> <code>${repository.countUsers()}</code>"
     }
 
     private fun startReading(userId: Long, chatId: Long) {
