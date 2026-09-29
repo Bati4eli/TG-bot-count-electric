@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "ru.sokolniki"
-version = "1.0.5"
+version = "1.0.6"
 
 repositories {
     mavenCentral()
@@ -27,6 +27,34 @@ tasks.register("buildAllJars") {
     description = "Собирает исполняемый JAR-файл Telegram-бота."
     group = "build"
     dependsOn(tasks.jar)
+}
+
+/** Отправляет основной бот и независимый срез сервиса тарифов в их репозитории Amvera. */
+tasks.register("DEPLOY_TO_AMVERA") {
+    group = "deployment"
+    description = "Публикует Telegram-бот и tariff-provider в Amvera."
+
+    doLast {
+        fun git(vararg arguments: String): String {
+            val process = ProcessBuilder(listOf("git") + arguments)
+                .directory(rootDir)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            check(process.waitFor() == 0) {
+                "Команда git ${arguments.joinToString(" ")} завершилась с ошибкой."
+            }
+            print(output)
+            return output
+        }
+
+        git("push", "amvera", "HEAD:master")
+        val providerCommit = git("subtree", "split", "--prefix=tariff-provider")
+            .lineSequence()
+            .lastOrNull { it.matches(Regex("[0-9a-f]{40}")) }
+            ?: error("Git не вернул хеш среза tariff-provider.")
+        git("push", "mosenergo", "$providerCommit:master")
+    }
 }
 
 kotlin {

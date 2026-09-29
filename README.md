@@ -96,16 +96,10 @@ TARIFF_SERVICE_TOKEN=<тот же общий секрет>          # секре
 
 ### Отправка новой версии
 
-После коммита отправьте основное приложение:
+После коммита одной командой отправьте обе части в их независимые Amvera-репозитории:
 
 ```powershell
-git push amvera HEAD:master
-```
-
-Одной командой отправьте обе части в их независимые Amvera-репозитории:
-
-```powershell
-git push amvera HEAD:master; if ($LASTEXITCODE -eq 0) { $providerCommit = git subtree split --prefix=tariff-provider; git push mosenergo "${providerCommit}:master" }
+.\gradlew.bat DEPLOY_TO_AMVERA
 ```
 
 После каждого push Amvera пересобирает и перезапускает соответствующее приложение. Проверяйте статус «Запущено» и журнал приложения в панели.
