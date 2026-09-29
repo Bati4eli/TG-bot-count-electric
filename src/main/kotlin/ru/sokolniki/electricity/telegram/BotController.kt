@@ -110,8 +110,18 @@ class BotController(
             }
             "edit:reading_t1" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T1, "Введите новое показание Т1.")
             "edit:reading_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_READING_T2, "Введите новое показание Т2.")
-            "edit:tariff_t1" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_TARIFF_T1, "Введите новый тариф Т1 в рублях за кВт·ч.")
-            "edit:tariff_t2" -> beginFieldEdit(callback.userId, chatId, ConversationStep.EDIT_TARIFF_T2, "Введите новый тариф Т2 в рублях за кВт·ч.")
+            "edit:tariff_t1" -> beginFieldEdit(
+                callback.userId,
+                chatId,
+                ConversationStep.EDIT_TARIFF_T1,
+                tariffInputPrompt(callback.userId, "Т1", "Введите новый тариф Т1 в рублях за кВт·ч."),
+            )
+            "edit:tariff_t2" -> beginFieldEdit(
+                callback.userId,
+                chatId,
+                ConversationStep.EDIT_TARIFF_T2,
+                tariffInputPrompt(callback.userId, "Т2", "Введите новый тариф Т2 в рублях за кВт·ч."),
+            )
             "tariffs:apply_recommended" -> applyRecommendedTariffs(callback.userId, chatId)
         }
     }
@@ -160,7 +170,11 @@ class BotController(
         if (!isConfigured(userId, chatId)) return
         if (repository.findActiveTariffs(userId) == null) {
             repository.saveState(userId, ConversationState(ConversationStep.TARIFF_T1))
-            telegram.sendMessage(chatId, "Сначала укажите тариф Т1 в рублях за кВт·ч.", KeyboardFactory.setup())
+            telegram.sendMessage(
+                chatId,
+                tariffInputPrompt(userId, "Т1", "Сначала укажите тариф Т1 в рублях за кВт·ч."),
+                KeyboardFactory.setup(),
+            )
             return
         }
         repository.saveState(userId, ConversationState(ConversationStep.READING_T1))
@@ -170,7 +184,7 @@ class BotController(
     private fun startTariffChange(userId: Long, chatId: Long) {
         if (!isConfigured(userId, chatId)) return
         repository.saveState(userId, ConversationState(ConversationStep.TARIFF_T1))
-        telegram.sendMessage(chatId, "Введите тариф Т1 в рублях за кВт·ч.", KeyboardFactory.setup())
+        telegram.sendMessage(chatId, tariffInputPrompt(userId, "Т1"), KeyboardFactory.setup())
     }
 
     private fun showOfficialTariffs(userId: Long, chatId: Long) {
@@ -180,15 +194,28 @@ class BotController(
             sendWithMenu(chatId, "Актуальные тарифы ещё загружаются. Повторите попытку через минуту.")
             return
         }
+        val userTariffs = repository.findActiveTariffs(userId)
+        val tariffsAreCurrent = userTariffs == official.tariffs
+        val userTariffsText = userTariffs?.let {
+            "Т1: <code>${formatDecimal(it.t1Rubles)} ₽</code>\n" +
+                "Т2: <code>${formatDecimal(it.t2Rubles)} ₽</code>"
+        } ?: "<i>ещё не настроены</i>"
+        val footer = if (tariffsAreCurrent) {
+            "✅ <b>У вас всё в порядке: уже установлены актуальные тарифы.</b>"
+        } else {
+            "Применение изменит тарифы только для следующих показаний."
+        }
         telegram.sendMessage(
             chatId,
             "💡 <b>Рекомендуемые тарифы</b>\n\n" +
+                "<b>Ваши тарифы:</b>\n$userTariffsText\n\n" +
+                "<b>Тарифы Мосэнергосбыта:</b>\n" +
                 "Т1: <code>${formatDecimal(official.tariffs.t1Rubles)} ₽</code>\n" +
                 "Т2: <code>${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n\n" +
-                "Московская область · сельский тариф · электроплита · 2 зоны · диапазон 1.\n" +
+                "Московская область · сельский тариф · 2х тарифный счетчик.\n" +
                 "<a href=\"${official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>\n\n" +
-                "Применение изменит тарифы только для следующих показаний.",
-            KeyboardFactory.applyRecommendedTariffs(official.tariffs),
+                footer,
+            if (tariffsAreCurrent) KeyboardFactory.main() else KeyboardFactory.applyRecommendedTariffs(official.tariffs),
             parseMode = "HTML",
         )
     }
@@ -373,7 +400,7 @@ class BotController(
         repository.saveProfile(profile)
         if (startsSetup) {
             repository.saveState(message.userId, ConversationState(ConversationStep.SETUP_TARIFF_T1))
-            telegram.sendMessage(message.chatId, "Введите тариф Т1 в рублях за кВт·ч.", KeyboardFactory.setup())
+            telegram.sendMessage(message.chatId, tariffInputPrompt(message.userId, "Т1"), KeyboardFactory.setup())
         } else {
             repository.clearState(message.userId)
             sendWithMenu(message.chatId, "Номер участка сохранён: ${profile.plotNumber}.")
@@ -384,7 +411,7 @@ class BotController(
         val tariffT1 = InputParser.tariffCents(message.text.orEmpty())
         val nextStep = if (setup) ConversationStep.SETUP_TARIFF_T2 else ConversationStep.TARIFF_T2
         repository.saveState(message.userId, ConversationState(nextStep, tariffT1))
-        telegram.sendMessage(message.chatId, "Введите тариф Т2 в рублях за кВт·ч.", KeyboardFactory.setup())
+        telegram.sendMessage(message.chatId, tariffInputPrompt(message.userId, "Т2"), KeyboardFactory.setup())
     }
 
     private fun saveTariffT2(message: IncomingMessage, state: ConversationState, setup: Boolean) {
@@ -437,6 +464,23 @@ class BotController(
     }
 
     private fun sendWithMenu(chatId: Long, text: String) = telegram.sendMessage(chatId, text, KeyboardFactory.main())
+
+    /** Формирует подсказку для ввода тарифа с сохранённым и официальным значениями зоны. */
+    private fun tariffInputPrompt(userId: Long, zone: String, title: String = "Введите тариф $zone в рублях за кВт·ч."): String {
+        val userTariff = repository.findActiveTariffs(userId)?.valueFor(zone)
+        val officialTariff = tariffUpdates.latest()?.tariffs?.valueFor(zone)
+        return "$title\n" +
+            "Текущее значение $zone: ${userTariff?.let(::formatTariff) ?: "не задан"}\n" +
+            "Тариф Мосэнергосбыта $zone: ${officialTariff?.let(::formatTariff) ?: "ещё не получен"}"
+    }
+
+    private fun Tariffs.valueFor(zone: String): Long = when (zone) {
+        "Т1" -> t1Cents
+        "Т2" -> t2Cents
+        else -> error("Неизвестная тарифная зона: $zone")
+    }
+
+    private fun formatTariff(cents: Long): String = formatDecimal(java.math.BigDecimal.valueOf(cents, 2)) + " ₽"
 
     private fun formatDecimal(value: java.math.BigDecimal): String = value.toPlainString().replace('.', ',')
 
