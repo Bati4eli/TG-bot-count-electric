@@ -10,6 +10,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 
 /** Получает сохранённые тарифы из отдельного защищённого сервиса тарифов. */
 class RemoteTariffServiceClient(
@@ -24,13 +25,13 @@ class RemoteTariffServiceClient(
     }
 
     /**
-     * Запрашивает у сервиса свежую официальную пару тарифов.
+     * Запрашивает у сервиса официальную пару тарифов для указанного московского дня.
      *
-     * Параметр `refresh=true` заставляет сервис обновить свой кэш именно по инициативе бота.
+     * Сервис сам решает, есть ли у него уже кэш для этой даты.
      */
-    fun fetchFresh(): OfficialTariffs {
+    fun fetchFor(date: LocalDate): OfficialTariffs {
         val response = http.send(
-            HttpRequest.newBuilder(refreshUri())
+            HttpRequest.newBuilder(requestUri(date))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Authorization", "Bearer $token")
                 .GET()
@@ -51,8 +52,8 @@ class RemoteTariffServiceClient(
         )
     }
 
-    private fun refreshUri(): URI {
-        val query = listOfNotNull(serviceUri.rawQuery, "refresh=true").joinToString("&")
+    private fun requestUri(date: LocalDate): URI {
+        val query = listOfNotNull(serviceUri.rawQuery, "date=$date").joinToString("&")
         return URI(serviceUri.scheme, serviceUri.authority, serviceUri.path, query, serviceUri.fragment)
     }
 

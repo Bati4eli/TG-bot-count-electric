@@ -215,6 +215,7 @@ class BotRunner(
 ) {
     fun runForever() {
         var offset = repository.getLastProcessedUpdateId()?.plus(1) ?: 0L
+        println("[bot] Ожидание обновлений Telegram с offset=$offset.")
         while (true) {
             try {
                 val updates = telegram.getUpdates(offset).sortedBy { it.updateId }
@@ -229,7 +230,7 @@ class BotRunner(
                     }
                 }
             } catch (error: Exception) {
-                System.err.println("Ошибка связи с Telegram: ${error.message}")
+                System.err.println("[bot] Ошибка связи с Telegram: ${error.message}")
                 Thread.sleep(2_000)
             }
         }

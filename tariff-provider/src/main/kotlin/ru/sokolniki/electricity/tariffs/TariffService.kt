@@ -2,9 +2,12 @@ package ru.sokolniki.electricity.tariffs
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import ru.sokolniki.electricity.domain.BuildInfo
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.math.BigDecimal
+import java.time.LocalDate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 
@@ -32,6 +35,7 @@ class TariffServiceServer(
     private val fetchTariffs: () -> OfficialTariffs,
 ) {
     private val cacheLock = Any()
+    private var cachedDate: LocalDate? = null
     private var cachedTariffs: OfficialTariffs? = null
     private val server = HttpServer.create(InetSocketAddress(config.port), 0).apply {
         executor = Executors.newFixedThreadPool(2) { Thread(it, "tariff-service-http").apply { isDaemon = true } }
@@ -49,24 +53,36 @@ class TariffServiceServer(
     /** Запускает HTTP-сервер без фонового обращения к официальному калькулятору. */
     fun start() {
         server.start()
-        println("Сервис тарифов слушает порт ${config.port}.")
+        println("[tariff-provider] Запущен; HTTP-порт $port. Ожидание запросов от основного приложения.")
     }
 
     fun stop() {
+        println("[tariff-provider] Остановка HTTP-сервера.")
         server.stop(0)
+        println("[tariff-provider] Остановлен.")
     }
 
-    private fun loadTariffs(forceRefresh: Boolean): OfficialTariffs = synchronized(cacheLock) {
-        if (!forceRefresh) cachedTariffs?.let { return@synchronized it }
-        refreshCache()
+    private fun loadTariffs(date: LocalDate): OfficialTariffs = synchronized(cacheLock) {
+        if (cachedDate == date) cachedTariffs?.let {
+            println("[tariff-provider] Кэш тарифов за $date использован.")
+            return@synchronized it
+        }
+        println("[tariff-provider] Кэш за $date отсутствует; запрос к официальному калькулятору.")
+        refreshCache(date)
     }
 
-    private fun refreshCache(): OfficialTariffs {
+    private fun refreshCache(date: LocalDate): OfficialTariffs {
         repeat(REFRESH_ATTEMPTS) { attempt ->
             try {
                 val tariffs = fetchTariffs()
+                cachedDate = date
                 cachedTariffs = tariffs
-                println("Официальные тарифы успешно обновлены.")
+                println(
+                    "[tariff-provider] Тарифы за $date получены: " +
+                        "Т1 ${formatTariff(tariffs.tariffs.t1Cents)} ₽, " +
+                        "Т2 ${formatTariff(tariffs.tariffs.t2Cents)} ₽; " +
+                        "кэш в памяти обновлён.",
+                )
                 return tariffs
             } catch (error: Exception) {
                 val details = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.name
@@ -76,9 +92,7 @@ class TariffServiceServer(
                 error.printStackTrace(System.err)
             }
         }
-        return requireNotNull(cachedTariffs) {
-            "Не удалось получить официальные тарифы и в памяти нет предыдущего значения."
-        }
+        throw IllegalStateException("Не удалось получить официальные тарифы для $date.")
     }
 
     private fun handleTariffs(exchange: HttpExchange) {
@@ -89,9 +103,9 @@ class TariffServiceServer(
             exchange.responseHeaders.set("WWW-Authenticate", "Bearer")
             return exchange.respond(401, "Требуется авторизация.")
         }
-        val forceRefresh = exchange.requestURI.query?.split('&')?.any { it == "refresh=true" } == true
+        val date = parseRequestedDate(exchange) ?: return exchange.respond(400, "Не передана корректная дата date в формате ГГГГ-ММ-ДД.")
         val tariffs = try {
-            loadTariffs(forceRefresh)
+            loadTariffs(date)
         } catch (error: Exception) {
             val details = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.name
             return exchange.respond(503, "Не удалось получить официальные тарифы: $details")
@@ -106,6 +120,14 @@ class TariffServiceServer(
         responseBody.use { it.write(bytes) }
     }
 
+    private fun parseRequestedDate(exchange: HttpExchange): LocalDate? = exchange.requestURI.query
+        ?.split('&')
+        ?.firstOrNull { it.startsWith("date=") }
+        ?.removePrefix("date=")
+        ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    private fun formatTariff(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',')
+
     private companion object {
         const val REFRESH_ATTEMPTS = 3
     }
@@ -113,6 +135,13 @@ class TariffServiceServer(
 
 /** Запускает сервис тарифов в отдельном приложении. */
 fun runTariffService() {
+    println(BuildInfo.startupBanner("СЕРВИС ОФИЦИАЛЬНЫХ ТАРИФОВ"))
+    println("[tariff-provider] Запуск сервиса тарифов.")
     val config = TariffServiceConfigLoader.load()
-    TariffServiceServer(config, MosenergosbytTariffProvider()::fetch).runForever()
+    val service = TariffServiceServer(config, MosenergosbytTariffProvider()::fetch)
+    Runtime.getRuntime().addShutdownHook(Thread {
+        println("[tariff-provider] Получен сигнал завершения.")
+        service.stop()
+    })
+    service.runForever()
 }

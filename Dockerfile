@@ -1,3 +1,4 @@
+# Этап сборки: содержит Gradle и JDK, компилирует исходный код в готовый дистрибутив.
 FROM dh-mirror.gitverse.ru/gradle:9.2.0-jdk25 AS build
 
 WORKDIR /workspace
@@ -13,6 +14,8 @@ COPY src src
 # увидеть уже удалённым при создании слоя. Компилируем в процессе Gradle.
 RUN gradle installDist --no-daemon -Pkotlin.compiler.execution.strategy=in-process
 
+# Финальный этап: остаётся только JRE и результат сборки из этапа build.
+# Поэтому итоговый образ не содержит исходники, Gradle и инструменты компиляции.
 FROM dh-mirror.gitverse.ru/eclipse-temurin:25-jre
 
 RUN groupadd --system bot && useradd --system --gid bot --create-home bot

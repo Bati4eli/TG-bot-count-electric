@@ -3,6 +3,8 @@ package ru.sokolniki.electricity.tariffs
 import ru.sokolniki.electricity.domain.Tariffs
 import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.persistence.UserTariffTarget
+import java.time.Clock
+import java.time.LocalDate
 
 /**
  * Хранит последнюю официальную рекомендацию по тарифам и находит пользователей для уведомления.
@@ -12,12 +14,13 @@ import ru.sokolniki.electricity.persistence.UserTariffTarget
 class TariffUpdateService(
     private val repository: JdbcRepository,
     private val provider: RemoteTariffServiceClient?,
+    private val clock: Clock,
 ) {
     /** Получает текущие официальные тарифы и возвращает пользователей, ещё не получивших уведомление. */
     fun refresh(): List<TariffAlert> {
         val official = requireNotNull(provider) {
             "Не настроен адрес отдельного сервиса тарифов."
-        }.fetchFresh()
+        }.fetchFor(LocalDate.now(clock))
         val previous = repository.findOfficialTariffs()
         val officialChanged = previous?.tariffs != official.tariffs
         if (officialChanged) {

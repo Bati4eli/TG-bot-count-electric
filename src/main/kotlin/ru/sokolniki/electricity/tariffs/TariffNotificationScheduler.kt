@@ -16,7 +16,9 @@ class TariffNotificationJob(
 ) : Runnable {
     override fun run() {
         try {
-            updates.refresh().forEach { alert ->
+            println("[bot] Начато обновление официальных тарифов.")
+            val alerts = updates.refresh()
+            alerts.forEach { alert ->
                 try {
                     telegram.sendMessage(
                         alert.target.profile.chatId,
@@ -29,8 +31,9 @@ class TariffNotificationJob(
                     System.err.println("Не удалось уведомить пользователя ${alert.target.profile.telegramUserId} о тарифах: ${error.message}")
                 }
             }
+            println("[bot] Официальные тарифы обновлены; уведомлений к отправке: ${alerts.size}.")
         } catch (error: Exception) {
-            System.err.println("Не удалось обновить официальные тарифы: ${error.message}")
+            System.err.println("[bot] Не удалось обновить официальные тарифы: ${error.message}")
         }
     }
 
@@ -69,6 +72,7 @@ class DailyTariffNotificationScheduler(
 
     /** Запускает неблокирующее первоначальное обновление и планирует последующие ежедневные проверки. */
     fun start() {
+        println("[bot] Планировщик тарифов запущен: сразу и ежедневно в 03:00 (Europe/Moscow).")
         executor.execute(job)
         executor.scheduleAtFixedRate(job, delayUntilNextThreeAm(), Duration.ofDays(1).toMillis(), TimeUnit.MILLISECONDS)
     }

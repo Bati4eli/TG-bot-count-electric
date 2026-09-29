@@ -1,3 +1,4 @@
+# Этап сборки: Gradle и JDK нужны только для компиляции сервиса в готовый дистрибутив.
 FROM dh-mirror.gitverse.ru/gradle:9.2.0-jdk25 AS build
 
 WORKDIR /workspace
@@ -9,6 +10,8 @@ COPY tariff-provider tariff-provider
 # См. корневой Dockerfile: это исключает гонку Kaniko с временными файлами Kotlin daemon.
 RUN chmod +x gradlew && gradle :tariff-provider:installDist --no-daemon -Pkotlin.compiler.execution.strategy=in-process
 
+# Финальный этап: лёгкий образ с JRE и собранным дистрибутивом из этапа build.
+# Gradle, JDK и исходный код в итоговый образ не попадают.
 FROM dh-mirror.gitverse.ru/eclipse-temurin:25-jre
 
 RUN groupadd --system provider && useradd --system --gid provider --create-home provider

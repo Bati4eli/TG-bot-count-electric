@@ -11,10 +11,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Проверяет, что отдельный сервис обновляет кэш только по явному запросу бота. */
+/** Проверяет, что отдельный сервис кэширует официальные тарифы по календарной дате. */
 class TariffServiceServerTest {
     @Test
-    fun `повторный запрос читает кэш а refresh обновляет его`() {
+    fun `повторный запрос в ту же дату читает кэш а новая дата обновляет его`() {
         val calls = AtomicInteger()
         val service = TariffServiceServer(
             TariffServiceConfig(token = "shared-secret", port = 0),
@@ -26,11 +26,11 @@ class TariffServiceServerTest {
         service.start()
         try {
             val port = service.port
-            assertEquals(200, request(port).statusCode())
-            assertEquals(200, request(port).statusCode())
+            assertEquals(200, request(port, "date=2026-09-28").statusCode())
+            assertEquals(200, request(port, "date=2026-09-28").statusCode())
             assertEquals(1, calls.get())
 
-            assertEquals(200, request(port, "refresh=true").statusCode())
+            assertEquals(200, request(port, "date=2026-09-29").statusCode())
             assertEquals(2, calls.get())
         } finally {
             service.stop()
