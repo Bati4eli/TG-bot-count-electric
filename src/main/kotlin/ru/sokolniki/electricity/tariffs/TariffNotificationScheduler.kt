@@ -23,7 +23,7 @@ class TariffNotificationJob(
                     telegram.sendMessage(
                         alert.target.profile.chatId,
                         alertText(alert),
-                        KeyboardFactory.applyRecommendedTariffs(alert.official.tariffs),
+                        replyMarkup(alert),
                         parseMode = "HTML",
                     )
                     updates.markAlertSent(alert.target.profile.telegramUserId, alert.official.tariffs)
@@ -50,12 +50,22 @@ class TariffNotificationJob(
             "Ваши: <code>Т1 ${format(it.t1Cents)} ₽ · Т2 ${format(it.t2Cents)} ₽</code>\n"
         } ?: "Ваши тарифы ещё не настроены.\n"
         val source = "<a href=\"${alert.official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>"
+        val applicationNote = if (actual == alert.official.tariffs) {
+            ""
+        } else {
+            "\n\nКнопка ниже применит тарифы только для следующих показаний. История не изменится."
+        }
         return "$headline\n\n" +
             "$actualText" +
             "Рекомендуемые: <code>Т1 ${format(alert.official.tariffs.t1Cents)} ₽ · Т2 ${format(alert.official.tariffs.t2Cents)} ₽</code>\n" +
             "Параметры: Московская область · сельский тариф · 2 тарифа.\n\n" +
-            "$source\n\n" +
-            "Кнопка ниже применит тарифы только для следующих показаний. История не изменится."
+            "$source$applicationNote"
+    }
+
+    private fun replyMarkup(alert: TariffAlert) = if (alert.target.tariffs == alert.official.tariffs) {
+        KeyboardFactory.main()
+    } else {
+        KeyboardFactory.applyRecommendedTariffs(alert.official.tariffs)
     }
 
     private fun format(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',')

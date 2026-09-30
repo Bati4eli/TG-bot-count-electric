@@ -28,6 +28,7 @@ class TariffUpdateService(
         }
         repository.saveOfficialTariffs(official.tariffs, official.retrievedAt)
         val savedOfficial = requireNotNull(latest())
+        if (previous != null && !officialChanged) return emptyList()
 
         return repository.findUsersWithActiveTariffs().mapNotNull { target ->
             if (repository.wasTariffAlertSent(target.profile.telegramUserId, savedOfficial.tariffs)) return@mapNotNull null
