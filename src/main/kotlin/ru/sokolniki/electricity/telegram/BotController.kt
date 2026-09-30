@@ -205,7 +205,7 @@ class BotController(
         if (!isConfigured(userId, chatId)) return
         val official = tariffUpdates.latest()
         if (official == null) {
-            sendWithMenu(chatId, "Актуальные тарифы ещё загружаются. Повторите попытку через минуту.")
+            sendWithMenu(chatId, "ℹ️ Актуальные тарифы ещё загружаются. Повторите попытку через минуту.")
             return
         }
         val userTariffs = repository.findActiveTariffs(userId)
@@ -244,7 +244,7 @@ class BotController(
                     "История и сохранённые показания не изменены.",
             )
         } catch (error: IllegalArgumentException) {
-            sendWithMenu(chatId, error.message ?: "Не удалось применить рекомендуемые тарифы.")
+            sendWithMenu(chatId, warning(error.message ?: "Не удалось применить рекомендуемые тарифы."))
         }
     }
 
@@ -258,7 +258,7 @@ class BotController(
         if (!isConfigured(userId, chatId)) return
         val calculation = readings.latestCalculation(userId)
         if (calculation == null) {
-            sendWithMenu(chatId, "Пока нет показаний для редактирования.")
+            sendWithMenu(chatId, warning("Пока нет показаний для редактирования."))
             return
         }
         repository.clearState(userId)
@@ -277,7 +277,7 @@ class BotController(
         parseMode: String? = null,
     ) {
         if (readings.latestCalculation(userId) == null) {
-            sendWithMenu(chatId, "Пока нет показаний для редактирования.")
+            sendWithMenu(chatId, warning("Пока нет показаний для редактирования."))
             return
         }
         repository.saveState(userId, ConversationState(step))
@@ -288,7 +288,7 @@ class BotController(
         if (!isConfigured(userId, chatId)) return
         val calculation = readings.latestCalculation(userId)
         if (calculation == null) {
-            sendWithMenu(chatId, "Пока нет показаний. Нажмите «${ButtonText.ADD_READING}».")
+            sendWithMenu(chatId, warning("Пока нет показаний. Нажмите «${ButtonText.ADD_READING}»."))
         } else {
             sendWithMenu(chatId, messages.readingSummary(calculation))
         }
@@ -325,7 +325,7 @@ class BotController(
 
     private fun handleDocument(message: IncomingMessage) {
         if (repository.stateFor(message.userId).step != ConversationStep.IMPORT_HISTORY) {
-            sendWithMenu(message.chatId, "Чтобы загрузить историю, сначала нажмите «${ButtonText.UPLOAD_HISTORY}».")
+            sendWithMenu(message.chatId, warning("Чтобы загрузить историю, сначала нажмите «${ButtonText.UPLOAD_HISTORY}»."))
             return
         }
         val document = message.document ?: return
@@ -355,7 +355,7 @@ class BotController(
         } catch (error: Exception) {
             telegram.sendMessage(
                 message.chatId,
-                "❌ Файл не импортирован: ${error.message ?: "проверьте файл."}\n\nИстория не изменена. Исправьте файл и отправьте его снова, либо отмените операцию через /cancel.",
+                warning("Файл не импортирован: ${error.message ?: "проверьте файл."}\n\nИстория не изменена. Исправьте файл и отправьте его снова, либо отмените операцию через /cancel."),
                 KeyboardFactory.setup(),
             )
         }
@@ -367,7 +367,7 @@ class BotController(
             return
         }
         val calculation = readings.latestCalculation(userId) ?: run {
-            sendWithMenu(chatId, "Пока нет показаний, из которых можно составить сообщение для банка.")
+            sendWithMenu(chatId, warning("Пока нет показаний, из которых можно составить сообщение для банка."))
             return
         }
         val text = messages.bankMessage(profile, calculation)
@@ -385,7 +385,7 @@ class BotController(
             return
         }
         val calculation = readings.latestCalculation(userId) ?: run {
-            sendWithMenu(chatId, "Пока нет показаний, из которых можно составить сообщение для председателя.")
+            sendWithMenu(chatId, warning("Пока нет показаний, из которых можно составить сообщение для чата."))
             return
         }
         val text = messages.chairmanMessage(profile, calculation)
@@ -416,7 +416,11 @@ class BotController(
                 ConversationStep.IDLE -> Unit
             }
         } catch (error: IllegalArgumentException) {
-            telegram.sendMessage(message.chatId, "${error.message ?: "Некорректное значение."}\nПовторите ввод или нажмите «${ButtonText.MENU}».", KeyboardFactory.setup())
+            telegram.sendMessage(
+                message.chatId,
+                warning("${error.message ?: "Некорректное значение."}\nПовторите ввод или нажмите «${ButtonText.MENU}»."),
+                KeyboardFactory.setup(),
+            )
         }
     }
 
@@ -428,7 +432,7 @@ class BotController(
             sendTariffInput(message.chatId, tariffInputPrompt(message.userId, "Т1"))
         } else {
             repository.clearState(message.userId)
-            sendWithMenu(message.chatId, "Номер участка сохранён: ${profile.plotNumber}.")
+            sendWithMenu(message.chatId, "✅ Номер участка сохранён: ${profile.plotNumber}.")
         }
     }
 
@@ -444,7 +448,7 @@ class BotController(
         val tariffs = Tariffs(tariffT1, InputParser.tariffCents(message.text.orEmpty()))
         repository.saveActiveTariffs(message.userId, tariffs)
         repository.clearState(message.userId)
-        val prefix = if (setup) "Настройка завершена." else "Тарифы сохранены."
+        val prefix = if (setup) "✅ Настройка завершена." else "✅ Тарифы сохранены."
         sendWithMenu(
             message.chatId,
             "$prefix Т1: ${tariffs.t1Rubles.toPlainString().replace('.', ',')} ₽, Т2: ${tariffs.t2Rubles.toPlainString().replace('.', ',')} ₽.",
@@ -461,7 +465,7 @@ class BotController(
         val t1 = requireNotNull(state.draftValue) { "Не найдено введённое показание Т1." }
         val calculation = readings.addReading(message.userId, t1, InputParser.readingHundredths(message.text.orEmpty()))
         repository.clearState(message.userId)
-        sendWithMenu(message.chatId, "Показание сохранено.\n\n${messages.readingSummary(calculation)}")
+        sendWithMenu(message.chatId, "✅ Показание сохранено.\n\n${messages.readingSummary(calculation)}")
     }
 
     private fun editLatest(message: IncomingMessage, step: ConversationStep) {
@@ -479,7 +483,7 @@ class BotController(
         val calculation = readings.updateLatest(message.userId, field, value)
         requireNotNull(calculation) { "Последнее показание не найдено." }
         repository.clearState(message.userId)
-        sendWithMenu(message.chatId, "Последнее показание изменено.\n\n${messages.readingSummary(calculation)}")
+        sendWithMenu(message.chatId, "✅ Последнее показание изменено.\n\n${messages.readingSummary(calculation)}")
     }
 
     private fun isConfigured(userId: Long, chatId: Long): Boolean {
@@ -489,6 +493,9 @@ class BotController(
     }
 
     private fun sendWithMenu(chatId: Long, text: String) = telegram.sendMessage(chatId, text, KeyboardFactory.main())
+
+    /** Добавляет единый заметный маркер к предупреждениям и ошибкам в диалоге. */
+    private fun warning(text: String): String = "🚨 $text"
 
     /** Отправляет подсказку для тарифа с HTML-цитатами для справочных значений. */
     private fun sendTariffInput(chatId: Long, text: String) =

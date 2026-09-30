@@ -163,11 +163,11 @@ class ExcelHistoryService(
             require(current.date.isAfter(previous.date)) {
                 "Строка $rowNumber: дата должна быть позже даты в предыдущей строке."
             }
-            require(current.t1Hundredths > previous.t1Hundredths) {
-                "Строка $rowNumber: показание Т1 должно быть больше предыдущего."
+            require(current.t1Hundredths >= previous.t1Hundredths) {
+                "Строка $rowNumber: показание Т1 не может быть меньше предыдущего."
             }
-            require(current.t2Hundredths > previous.t2Hundredths) {
-                "Строка $rowNumber: показание Т2 должно быть больше предыдущего."
+            require(current.t2Hundredths >= previous.t2Hundredths) {
+                "Строка $rowNumber: показание Т2 не может быть меньше предыдущего."
             }
         }
     }

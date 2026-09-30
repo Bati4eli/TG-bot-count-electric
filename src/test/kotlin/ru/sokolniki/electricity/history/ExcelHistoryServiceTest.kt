@@ -33,7 +33,7 @@ class ExcelHistoryServiceTest {
     }
 
     @Test
-    fun `rejects history where a meter reading does not increase`() {
+    fun `rejects history where a meter reading decreases`() {
         val exported = service.export(
             listOf(
                 reading("2026-07-01", 10_000, 20_000, 733, 332),
@@ -41,12 +41,28 @@ class ExcelHistoryServiceTest {
             ),
         )
         val invalid = mutate(exported) { workbook ->
-            workbook.getSheet("ПОКАЗАНИЯ СЧЕТЧИКОВ").getRow(2).getCell(1).setCellValue(100.00)
+            workbook.getSheet("ПОКАЗАНИЯ СЧЕТЧИКОВ").getRow(2).getCell(1).setCellValue(99.99)
         }
 
         val error = assertFailsWith<IllegalArgumentException> { service.import(invalid) }
 
-        assertEquals("Строка 3: показание Т1 должно быть больше предыдущего.", error.message)
+        assertEquals("Строка 3: показание Т1 не может быть меньше предыдущего.", error.message)
+    }
+
+    @Test
+    fun `accepts history where a meter reading remains unchanged`() {
+        val exported = service.export(
+            listOf(
+                reading("2026-07-01", 10_000, 20_000, 733, 332),
+                reading("2026-08-01", 10_000, 20_000, 733, 332),
+            ),
+        )
+
+        val imported = service.import(exported)
+
+        assertEquals(2, imported.size)
+        assertEquals(10_000, imported[1].t1Hundredths)
+        assertEquals(20_000, imported[1].t2Hundredths)
     }
 
     @Test
