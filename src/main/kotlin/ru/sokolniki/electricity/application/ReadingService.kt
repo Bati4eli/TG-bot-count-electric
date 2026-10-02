@@ -7,6 +7,7 @@ import ru.sokolniki.electricity.domain.LatestReading
 import ru.sokolniki.electricity.domain.MeterReading
 import ru.sokolniki.electricity.domain.ReadingCalculation
 import ru.sokolniki.electricity.domain.Tariffs
+import ru.sokolniki.electricity.domain.UserDateFormat
 import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.persistence.HistoryReplacementResult
 import java.time.Clock
@@ -26,7 +27,7 @@ class ReadingService(
         }
         val readingDate = LocalDate.now(clock)
         require(!repository.hasReadingOnDate(userId, readingDate)) {
-            "Показание за $readingDate уже сохранено. Если нужно исправление, используйте «Изменить последнее»."
+            "Показание за ${UserDateFormat.format(readingDate)} уже сохранено. Если нужно исправление, используйте «Изменить показание»."
         }
         val previous = repository.findLatestReading(userId)?.current
         val draft = MeterReading(

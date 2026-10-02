@@ -8,11 +8,12 @@ import ru.sokolniki.electricity.domain.InputParser
 import ru.sokolniki.electricity.domain.MessageFormatter
 import ru.sokolniki.electricity.domain.Tariffs
 import ru.sokolniki.electricity.domain.UserProfile
+import ru.sokolniki.electricity.domain.UserDateFormat
 import ru.sokolniki.electricity.history.ExcelHistoryService
 import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.tariffs.TariffUpdateService
+import ru.sokolniki.electricity.tariffs.TariffMessageFormatter
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 /** Направляет обновления Telegram к сценариям настройки, показаний, истории и меню. */
 class BotController(
@@ -164,7 +165,7 @@ class BotController(
             "$indent<i>ещё нет</i>"
         } else {
             val staleMark = if (latest.date.isBefore(java.time.LocalDate.now(ZoneId.of("Europe/Moscow")).minusDays(25))) " ❗" else ""
-            "$indent<code>${latest.date}$staleMark</code>\n" +
+            "$indent<code>${UserDateFormat.format(latest.date)}$staleMark</code>\n" +
                 "${indent}Т1: <code>${formatDecimal(latest.t1Kwh)} кВт·ч</code>\n" +
                 "${indent}Т2: <code>${formatDecimal(latest.t2Kwh)} кВт·ч</code>"
         }
@@ -173,7 +174,7 @@ class BotController(
         } else {
             "$indent<code>Т1 ${formatDecimal(official.tariffs.t1Rubles)} ₽ · " +
                 "Т2 ${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n" +
-                "$indent<i>получены ${OFFICIAL_TARIFF_DATE_FORMAT.format(official.retrievedAt)}</i>"
+                "$indent<i>получены ${UserDateFormat.format(official.retrievedAt.atZone(ZoneId.of("Europe/Moscow")).toLocalDate())}</i>"
         }
         return "<b>Главное меню</b>\n\n" +
             "🏡 <b>Участок:</b> <code>${escapeHtml(profile.plotNumber)}</code>\n" +
@@ -209,27 +210,16 @@ class BotController(
             return
         }
         val userTariffs = repository.findActiveTariffs(userId)
-        val tariffsAreCurrent = userTariffs == official.tariffs
-        val userTariffsText = userTariffs?.let {
-            "Т1: <code>${formatDecimal(it.t1Rubles)} ₽</code>\n" +
-                "Т2: <code>${formatDecimal(it.t2Rubles)} ₽</code>"
-        }
-        val footer = if (tariffsAreCurrent) {
+        val needsApplication = TariffMessageFormatter.needsApplication(userTariffs, official)
+        val headline = if (!needsApplication) {
             "✅ <b>У вас всё в порядке: уже установлены актуальные тарифы.</b>"
         } else {
-            "Применение изменит тарифы только для следующих показаний." +
-                userTariffsText?.let { "\n\n<b>Ваши тарифы:</b>\n$it" }.orEmpty()
+            "⚠️ <b>Ваши вручную введённые тарифы отличаются от актуальных.</b>"
         }
         telegram.sendMessage(
             chatId,
-            "💡 <b>Рекомендуемые тарифы</b>\n\n" +
-                "<b>Тарифы Мосэнергосбыта:</b>\n" +
-                "Т1: <code>${formatDecimal(official.tariffs.t1Rubles)} ₽</code>\n" +
-                "Т2: <code>${formatDecimal(official.tariffs.t2Rubles)} ₽</code>\n\n" +
-                "Московская область · сельский тариф · 2х тарифный счетчик.\n" +
-                "<a href=\"${official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>\n\n" +
-                footer,
-            if (tariffsAreCurrent) KeyboardFactory.main() else KeyboardFactory.applyRecommendedTariffs(official.tariffs),
+            TariffMessageFormatter.format(userTariffs, official, headline),
+            if (needsApplication) KeyboardFactory.applyRecommendedTariffs(official.tariffs) else KeyboardFactory.main(),
             parseMode = "HTML",
         )
     }
@@ -373,7 +363,7 @@ class BotController(
         val text = messages.bankMessage(profile, calculation)
         telegram.sendMessage(
             chatId,
-            "$text\n\nОплатить: <code>${calculation.paymentRubles} р</code>",
+            "$text\n\nОплатить: <code>${calculation.paymentRubles}</code>₽",
             KeyboardFactory.copyText(text),
             parseMode = "HTML",
         )
@@ -518,7 +508,7 @@ class BotController(
     private fun readingInputPrompt(userId: Long, zone: String, title: String): String {
         val latest = readings.latestCalculation(userId)?.current
         val quote = latest?.let {
-            "<blockquote>Последнее показание от ${it.date}: " +
+            "<blockquote>Последнее показание от ${UserDateFormat.format(it.date)}: " +
                 "Т1 ${formatDecimal(it.t1Kwh)} · Т2 ${formatDecimal(it.t2Kwh)} кВт·ч</blockquote>\n\n"
         }.orEmpty()
         return quote + "${title.trimEnd('.', ':')}:"
@@ -533,12 +523,6 @@ class BotController(
     private fun formatTariff(cents: Long): String = formatDecimal(java.math.BigDecimal.valueOf(cents, 2)) + " ₽"
 
     private fun formatDecimal(value: java.math.BigDecimal): String = value.toPlainString().replace('.', ',')
-
-    private companion object {
-        val OFFICIAL_TARIFF_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter
-            .ofPattern("dd.MM.yyyy HH:mm")
-            .withZone(ZoneId.of("Europe/Moscow"))
-    }
 
     private fun escapeHtml(value: String): String = value
         .replace("&", "&amp;")

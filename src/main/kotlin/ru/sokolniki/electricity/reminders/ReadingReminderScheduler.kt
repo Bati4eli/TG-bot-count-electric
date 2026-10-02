@@ -2,6 +2,7 @@ package ru.sokolniki.electricity.reminders
 
 import ru.sokolniki.electricity.persistence.JdbcRepository
 import ru.sokolniki.electricity.persistence.ReadingReminderTarget
+import ru.sokolniki.electricity.domain.UserDateFormat
 import ru.sokolniki.electricity.telegram.KeyboardFactory
 import ru.sokolniki.electricity.telegram.TelegramClient
 import java.time.Clock
@@ -48,7 +49,7 @@ class ReadingReminderJob(
     }
 
     private fun reminderText(target: ReadingReminderTarget): String {
-        val latest = target.latestReadingDate?.let { "Последнее показание: <code>$it</code>." }
+        val latest = target.latestReadingDate?.let { "Последнее показание: <code>${UserDateFormat.format(it)}</code>." }
             ?: "Показания ещё не передавались."
         return "⏰ <b>Напоминание о показаниях.</b>\n\n" +
             "За последние $MAX_DAYS_WITHOUT_READING дней от вас не было новых показаний.\n" +

@@ -2,12 +2,9 @@ package ru.sokolniki.electricity.domain
 
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.format.DateTimeFormatter
 
 /** Формирует пользовательские сводки и копируемые сообщения об оплате по рассчитанным показаниям. */
 class MessageFormatter {
-    private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-
     fun bankMessage(profile: UserProfile, calculation: ReadingCalculation): String = with(calculation) {
         "Уч.${profile.plotNumber}: эл-во. Расход T1:${whole(consumption.t1Kwh)} " +
             "T2:${whole(consumption.t2Kwh)}. Показания T1:${whole(current.t1Kwh)} " +
@@ -17,7 +14,7 @@ class MessageFormatter {
     fun chairmanMessage(profile: UserProfile, calculation: ReadingCalculation): String = with(calculation) {
         """
         уч. ${profile.plotNumber}
-        Показания счетчиков на ${current.date.format(dateFormatter)}
+        Показания счетчиков на ${UserDateFormat.format(current.date)}:
         ТО: ${whole(current.t1Kwh + current.t2Kwh)}
         Т1: ${whole(current.t1Kwh)}
         Т2: ${whole(current.t2Kwh)}
@@ -32,7 +29,7 @@ class MessageFormatter {
     fun readingSummary(calculation: ReadingCalculation): String = with(calculation) {
         """
         📊 Последнее показание
-        📅 ${current.date.format(dateFormatter)}
+        📅 ${UserDateFormat.format(current.date)}
 
         ⚡ Показания счётчика
         • Т1: ${kwh(current.t1Kwh)} кВт·ч

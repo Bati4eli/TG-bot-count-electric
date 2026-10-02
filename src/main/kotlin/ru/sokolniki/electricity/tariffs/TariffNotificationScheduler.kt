@@ -2,6 +2,7 @@ package ru.sokolniki.electricity.tariffs
 
 import ru.sokolniki.electricity.telegram.KeyboardFactory
 import ru.sokolniki.electricity.telegram.TelegramClient
+import ru.sokolniki.electricity.domain.Tariffs
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -47,34 +48,40 @@ class TariffNotificationJob(
         } else {
             "💡 <b>Актуальные тарифы Мосэнергосбыта.</b>"
         }
-        val actualText = actual?.let {
-            "Ваши: <code>Т1 ${format(it.t1Cents)} ₽ · Т2 ${format(it.t2Cents)} ₽</code>\n"
-        } ?: "Ваши тарифы ещё не настроены.\n"
-        val applicationNote = if (actual == alert.official.tariffs) {
-            ""
-        } else {
-            "\n\nКнопка ниже применит тарифы только для следующих показаний. История не изменится."
-        }
+        return TariffMessageFormatter.format(actual, alert.official, headline)
+    }
+
+    private fun replyMarkup(alert: TariffAlert) = if (TariffMessageFormatter.needsApplication(alert.target.tariffs, alert.official)) {
+        KeyboardFactory.applyRecommendedTariffs(alert.official.tariffs)
+    } else {
+        KeyboardFactory.main()
+    }
+
+}
+
+/** Формирует единый HTML-вид для ручного просмотра и фоновых уведомлений о тарифах. */
+object TariffMessageFormatter {
+    /** Подставляет пользовательские и официальные тарифы в общий шаблон сообщения. */
+    fun format(actual: Tariffs?, official: OfficialTariffs, headline: String): String {
+        val actualText = actual?.let { "Ваши: <code>Т1 ${formatTariff(it.t1Cents)} ₽ · Т2 ${formatTariff(it.t2Cents)} ₽</code>" }
+            ?: "Ваши тарифы ещё не настроены."
+        val applicationNote = if (actual == official.tariffs) "" else "\n\nКнопка ниже применит тарифы только для следующих показаний. История не изменится."
         return """
             $headline
 
-            ${actualText.trimEnd()}
-            Рекомендуемые: <code>Т1 ${format(alert.official.tariffs.t1Cents)} ₽ · Т2 ${format(alert.official.tariffs.t2Cents)} ₽</code>
+            $actualText
+            Рекомендуемые: <code>Т1 ${formatTariff(official.tariffs.t1Cents)} ₽ · Т2 ${formatTariff(official.tariffs.t2Cents)} ₽</code>
 
-            ${"<a href=\"${alert.official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>"}
+            <a href="${official.sourceUrl}">Официальный калькулятор Мосэнергосбыта</a>
             <blockquote>Параметры: Московская область · сельский тариф · 2 тарифа.</blockquote>$applicationNote
         """.trimIndent()
     }
 
-    private fun replyMarkup(alert: TariffAlert) = if (alert.target.tariffs == alert.official.tariffs) {
-        KeyboardFactory.main()
-    } else {
-        KeyboardFactory.applyRecommendedTariffs(alert.official.tariffs)
-    }
+    /** Возвращает, нужно ли показать действие применения рекомендации. */
+    fun needsApplication(actual: Tariffs?, official: OfficialTariffs): Boolean = actual != official.tariffs
 
     /** Преобразует тариф из копеек в компактный вид для сообщения. */
-    private fun format(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',')
-
+    private fun formatTariff(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',')
 }
 
 /** Запускает задачу уведомлений при старте, а затем каждый день в 03:00 по московскому времени. */
