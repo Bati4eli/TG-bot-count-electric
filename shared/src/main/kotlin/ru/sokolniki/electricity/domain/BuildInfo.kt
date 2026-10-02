@@ -2,7 +2,7 @@ package ru.sokolniki.electricity.domain
 
 /** Содержит версию, выводимую в журнале при запуске обоих приложений. */
 object BuildInfo {
-    const val VERSION = "1.0.17"
+    const val VERSION = "1.0.18"
 
     /** Формирует заметный разделитель начала нового экземпляра приложения в журнале. */
     fun startupBanner(applicationName: String): String = """

@@ -67,14 +67,14 @@ object TariffMessageFormatter {
             ?: "Ваши тарифы ещё не настроены."
         val applicationNote = if (actual == official.tariffs) "" else "\n\nКнопка ниже применит тарифы только для следующих показаний. История не изменится."
         return """
-            $headline
-
-            $actualText
-            Рекомендуемые: <code>Т1 ${formatTariff(official.tariffs.t1Cents)} ₽ · Т2 ${formatTariff(official.tariffs.t2Cents)} ₽</code>
-
-            <a href="${official.sourceUrl}">Официальный калькулятор Мосэнергосбыта</a>
-            <blockquote>Параметры: Московская область · сельский тариф · 2 тарифа.</blockquote>$applicationNote
-        """.trimIndent()
+            |$headline
+            |
+            |$actualText
+            |Рекомендуемые: <code>Т1 ${formatTariff(official.tariffs.t1Cents)} ₽</code> · <code>Т2 ${formatTariff(official.tariffs.t2Cents)} ₽</code>
+            |
+            |<a href="${official.sourceUrl}">Официальный калькулятор Мосэнергосбыта</a>
+            |<blockquote>Параметры: Московская область · сельский тариф · 2 тарифа.</blockquote>$applicationNote
+        """.trimMargin()
     }
 
     /** Возвращает, нужно ли показать действие применения рекомендации. */
