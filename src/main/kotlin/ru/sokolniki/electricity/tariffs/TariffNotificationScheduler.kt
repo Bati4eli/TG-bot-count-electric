@@ -37,6 +37,7 @@ class TariffNotificationJob(
         }
     }
 
+    /** Подставляет данные уведомления в единый HTML-шаблон для пользователя. */
     private fun alertText(alert: TariffAlert): String {
         val actual = alert.target.tariffs
         val headline = if (alert.firstSuccessfulLookup || alert.officialChanged) {
@@ -49,17 +50,20 @@ class TariffNotificationJob(
         val actualText = actual?.let {
             "Ваши: <code>Т1 ${format(it.t1Cents)} ₽ · Т2 ${format(it.t2Cents)} ₽</code>\n"
         } ?: "Ваши тарифы ещё не настроены.\n"
-        val source = "<a href=\"${alert.official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>"
         val applicationNote = if (actual == alert.official.tariffs) {
             ""
         } else {
             "\n\nКнопка ниже применит тарифы только для следующих показаний. История не изменится."
         }
-        return "$headline\n\n" +
-            "$actualText" +
-            "Рекомендуемые: <code>Т1 ${format(alert.official.tariffs.t1Cents)} ₽ · Т2 ${format(alert.official.tariffs.t2Cents)} ₽</code>\n" +
-            "Параметры: Московская область · сельский тариф · 2 тарифа.\n\n" +
-            "$source$applicationNote"
+        return """
+            $headline
+
+            ${actualText.trimEnd()}
+            Рекомендуемые: <code>Т1 ${format(alert.official.tariffs.t1Cents)} ₽ · Т2 ${format(alert.official.tariffs.t2Cents)} ₽</code>
+
+            ${"<a href=\"${alert.official.sourceUrl}\">Официальный калькулятор Мосэнергосбыта</a>"}
+            <blockquote>Параметры: Московская область · сельский тариф · 2 тарифа.</blockquote>$applicationNote
+        """.trimIndent()
     }
 
     private fun replyMarkup(alert: TariffAlert) = if (alert.target.tariffs == alert.official.tariffs) {
@@ -68,7 +72,9 @@ class TariffNotificationJob(
         KeyboardFactory.applyRecommendedTariffs(alert.official.tariffs)
     }
 
+    /** Преобразует тариф из копеек в компактный вид для сообщения. */
     private fun format(cents: Long): String = BigDecimal.valueOf(cents, 2).toPlainString().replace('.', ',')
+
 }
 
 /** Запускает задачу уведомлений при старте, а затем каждый день в 03:00 по московскому времени. */

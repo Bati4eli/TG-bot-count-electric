@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "ru.sokolniki"
-version = "1.0.15"
+version = "1.0.16"
 
 repositories {
     mavenCentral()
